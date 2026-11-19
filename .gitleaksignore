@@ -1,0 +1,9 @@
+# False positives: the algorithm name MLKEM768-X25519 in the modern-web-guidance skill docs.
+4e9ffc4bc426f39e006c31e2415781cad78243f3:.agents/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:187
+4e9ffc4bc426f39e006c31e2415781cad78243f3:.agents/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:201
+4e9ffc4bc426f39e006c31e2415781cad78243f3:.claude/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:187
+4e9ffc4bc426f39e006c31e2415781cad78243f3:.claude/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:201
+.agents/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:187
+.agents/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:201
+.claude/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:187
+.claude/skills/modern-web-guidance/guides/security/client-side-encryption.md:generic-api-key:201
