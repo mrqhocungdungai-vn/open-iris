@@ -76,7 +76,14 @@ let muted = false; // HUD 🔇: mic chunks are dropped here, the session stays o
 // Livestream (Features tab): listen-only drops Iris's audio and transcript and refuses tools, the mic still goes in.
 let listenOnly = false;
 let recapOn = false; // co-host and recap switches as they were at connect
-const recap = createRecap({ send: () => recapOn && !listenOnly && session?.sendRealtimeInput({ text: RECAP_EVENT }) });
+const recap = createRecap({
+  send: () => {
+    if (!recapOn || listenOnly || !session) return false; // retried next second, see createRecap
+    session.sendRealtimeInput({ text: RECAP_EVENT });
+    log("INFO", "live", "recap sent");
+    return true;
+  },
+});
 
 // A second live:start while one is still connecting is a no-op.
 let starting = false;
@@ -299,6 +306,7 @@ ipcMain.handle("config:coding", (_e, on) => writeConfig({ ...readConfig(), codin
 ipcMain.handle("config:live", (_e, patch) => {
   const { cohost, recap, topic } = patch || {};
   writeConfig({ ...readConfig(), ...(cohost !== undefined && { cohost }), ...(recap !== undefined && { recap }), ...(topic !== undefined && { topic }) });
+  log("INFO", "live", `livestream settings ${JSON.stringify({ cohost, recap, topic })}`);
 });
 ipcMain.handle("config:session", (_e, title) => {
   writeConfig({ ...readConfig(), session: title });

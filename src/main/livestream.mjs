@@ -22,6 +22,7 @@ export const LISTEN_ON_EVENT = "SYSTEM_EVENT_LISTEN_ON: Listen mode is on. Keep 
 export const LISTEN_OFF_EVENT = "SYSTEM_EVENT_LISTEN_OFF: Listen mode is off. Do not reply to this notice; answer normally from the next time you are spoken to.";
 
 // Fires send() once intervalMs has passed AND nobody (user or Iris) has spoken for quietMs; while someone talks it waits, it never skips.
+// send() returns false when it could not speak (listen-only, no session): the slot stays open and the next quiet second retries.
 export function createRecap({ intervalMs = RECAP_MS, quietMs = QUIET_MS, send, now = Date.now, setInterval: setTick = setInterval, clearInterval: clearTick = clearInterval }) {
   let tick = null;
   let lastRecapAt = 0;
@@ -29,8 +30,8 @@ export function createRecap({ intervalMs = RECAP_MS, quietMs = QUIET_MS, send, n
   function check() {
     const t = now();
     if (t - lastRecapAt >= intervalMs && t - lastActivityAt >= quietMs) {
+      if (send() === false) return;
       lastRecapAt = lastActivityAt = t;
-      send();
     }
   }
   return {

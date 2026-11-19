@@ -53,6 +53,21 @@ t += RECAP_MS - 1;
 tick();
 assert.equal(sent, 2);
 
+// A blocked send (listen-only) does not use up the slot: it fires as soon as sending works again.
+let can = false;
+let fired = 0;
+t = 0;
+const held = createRecap({ send: () => can && ++fired > 0, now: () => t, setInterval: (fn) => (tick = fn), clearInterval: () => (tick = null) });
+held.start();
+t = RECAP_MS + QUIET_MS;
+tick();
+assert.equal(fired, 0);
+t += 60_000;
+can = true;
+tick();
+assert.equal(fired, 1);
+held.stop();
+
 // Listen-only: every call refused, ids kept.
 assert.deepEqual(refuseCalls([{ id: "a", name: "click", args: {} }]), [{ id: "a", name: "click", response: { error: "Refused: listen mode is on." } }]);
 
