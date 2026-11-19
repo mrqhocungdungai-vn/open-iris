@@ -68,7 +68,10 @@ const TOOLS = {
   },
   press_key_combo: {
     description: "Send a key combo to an app, e.g. return, escape, cmd+n. Return or enter can send a message, so it needs confirmed true, which you may set only after the user said yes out loud.",
-    parameters: { combo: str("Key combo"), app: str("Target application name"), confirmed: CONFIRMED("pressing return or enter") },
+    parameters: {
+      combo: str("Key combo"), app: str("Target application name"), confirmed: CONFIRMED("pressing return or enter"),
+      ref: { type: "string", description: "Qualified ref of the field the keys are for. Give it when pressing return after typing, e.g. the address bar or search box you just typed into" },
+    },
     required: ["combo", "app"],
     argv: ({ combo, app }) => ["press", combo, "--app", app],
   },
@@ -85,6 +88,7 @@ export const DESKTOP_BRIEF =
   "To type, first get the ref of the text area or text field itself (find_app_control with role textarea or textfield), not a row or cell. " +
   "type_into_text_field adds to the text already in the field. Set replace true when the user corrects or asks you to retype what you typed, or for an address or search box; " +
   "leave it false when the user wants to add to text that is already there, and never erase text you did not type unless asked. " +
+  "To submit what you typed (search, address bar, chat box), call press_key_combo return with ref set to that same field. " +
   "Never say an action happened unless its tool result was ok. " +
   "If typing fails, do not click Send, submit or press return: stop and tell the user typing failed. " +
   "Ask the user before anything destructive (deleting, sending, purchasing).";
@@ -107,6 +111,10 @@ const TYPE_WAYS = {
   "type --headed": (ref) => ["--headed", "type", ref, "--stdin"],
 };
 
+// Chrome's address bar shows semantically typed text but return then does nothing; physical keystrokes work (tested 2026-11-19).
+// shortcut: matched by app name; add other Chromium browsers here when they show the same problem.
+const KEYSTROKE_APPS = /^(google chrome|chromium|microsoft edge|brave browser|arc|opera|vivaldi)$/i;
+
 // Registry entries like tools.mjs registry(): { name, description, parameters, desktop: true, run }.
 // run() never throws and returns { ok, output } or { ok: false, error }. One instance per live session.
 export function desktopTools(cli = runCli) {
@@ -122,7 +130,7 @@ export function desktopTools(cli = runCli) {
 
   async function typeText({ ref, text, app, replace }) {
     const ways = Object.keys(TYPE_WAYS);
-    let start = Math.max(0, ways.indexOf(typeWins.get(app)));
+    let start = Math.max(0, ways.indexOf(KEYSTROKE_APPS.test(app ?? "") ? "type --headed" : typeWins.get(app)));
     // Retyping appended, piling text up in Chrome's address bar (PoC round 6). If clear fails, set-value replaces the value itself.
     if (replace && (await cli(["clear", ref])).ok === false) start = Math.max(start, ways.indexOf("set-value"));
     // Teams' composer ignored clear and the retype appended (log 2026-11-19), so check it and clear like a person: ⌘A, delete.
@@ -173,7 +181,23 @@ export function desktopTools(cli = runCli) {
     if (name === "press_key_combo" && !args.confirmed && /(^|\+)(return|enter)$/i.test(args.combo ?? "")) {
       return { ok: false, error: { code: "NEEDS_CONFIRMATION", message: `Pressing ${args.combo} may send or submit. Ask the user to confirm, then call again with confirmed true.` } };
     }
+    if (name === "press_key_combo") return pressKeys(args);
     return cli(TOOLS[name].argv(args));
+  }
+
+  // Chrome's address bar ignored a headless return after typing: "ok" with no effect, later "no verified focused element" (log 2026-11-19).
+  // With the field's ref, focus it and press physically like a person (--headed, user OK'd 2026-11-18); without one, go headed only when headless finds no focus.
+  async function pressKeys({ combo, app, ref }) {
+    const headed = async () => {
+      const r = await cli(["--headed", ...TOOLS.press_key_combo.argv({ combo, app })]);
+      return r.ok === false ? r : { ...r, verify: VERIFY };
+    };
+    if (ref) {
+      const f = await cli(["--headed", "focus", ref]);
+      return f.ok === false ? f : headed();
+    }
+    const r = await cli(TOOLS.press_key_combo.argv({ combo, app }));
+    return r.ok === false && r.error?.code === "ACTION_FAILED" ? headed() : r;
   }
 
   return Object.entries(TOOLS).map(([name, t]) => ({

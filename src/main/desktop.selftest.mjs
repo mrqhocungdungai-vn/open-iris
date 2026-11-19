@@ -34,6 +34,35 @@ for (const t of desktopTools()) assert.ok(t.desktop && t.parameters.type === "ob
   assert.equal(f.calls.length, 0);
   assert.equal((await f.run("press_key_combo", { combo: "cmd+n", app: "Notes" })).ok, true);
 }
+// Chrome: typed with physical keystrokes from the start, so its address bar acts on return.
+{
+  const f = fake((a) => (a[0] === "get" ? { ok: true, data: "" } : null));
+  assert.equal((await f.run("type_into_text_field", { ref: "@s:e1", text: "tesla", app: "Google Chrome", replace: true })).output.fallback, "type --headed");
+  assert.deepEqual(f.calls.at(-1).argv, ["--headed", "type", "@s:e1", "--stdin"]);
+}
+// Return with the field's ref: focus it, then press physically (Chrome ignored a headless return, log 2026-11-19).
+{
+  const f = fake(() => null);
+  const r = await f.run("press_key_combo", { combo: "return", app: "Google Chrome", ref: "@s:e1", confirmed: true });
+  assert.equal(r.ok, true);
+  assert.match(r.output.verify, /read_app_text/);
+  assert.deepEqual(f.calls.map((c) => c.argv), [["--headed", "focus", "@s:e1"], ["--headed", "press", "return", "--app", "Google Chrome"]]);
+}
+// A focus that fails stops there; no keys go out.
+{
+  const f = fake((a) => (a[1] === "focus" ? { ok: false, error: { code: "STALE_REF" } } : null));
+  assert.equal((await f.run("press_key_combo", { combo: "return", app: "Google Chrome", ref: "@s:e1", confirmed: true })).error.code, "STALE_REF");
+  assert.equal(f.calls.length, 1);
+}
+// Without a ref, headless first; "no focused element" retries headed, other errors go back as they are.
+{
+  const f = fake((a) => (a[0] === "press" ? { ok: false, error: { code: "ACTION_FAILED" } } : null));
+  assert.equal((await f.run("press_key_combo", { combo: "return", app: "Google Chrome", confirmed: true })).ok, true);
+  assert.deepEqual(f.calls.map((c) => c.argv[0]), ["press", "--headed"]);
+  const g = fake((a) => (a[0] === "press" ? { ok: false, error: { code: "APP_NOT_FOUND" } } : null));
+  assert.equal((await g.run("press_key_combo", { combo: "cmd+n", app: "Nope" })).error.code, "APP_NOT_FOUND");
+  assert.equal(g.calls.length, 1);
+}
 // The same call a fourth time in a row is refused; a different call resets the count.
 {
   const f = fake(() => null);
