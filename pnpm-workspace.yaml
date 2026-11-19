@@ -1,0 +1,6 @@
+allowBuilds:
+  '@google/genai': false
+  protobufjs: false
+  agent-desktop: true
+  electron: true
+  pnpm: false

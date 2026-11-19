@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Bản đề xuất bố cục cửa sổ chính của Iris: hội thoại trước.">
+<title>Iris, hội thoại trước</title>
+<link rel="stylesheet" href="app.css">
+<body class="app va" data-state="offline">
+<header class="bar">
+  <h1 class="mark">Iris</h1>
+  <fieldset class="tabs"><legend class="visually-hidden">Khu vực</legend>
+    <input type="radio" name="tab" id="t-talk" checked><label for="t-talk">Hội thoại</label>
+    <input type="radio" name="tab" id="t-set"><label for="t-set">Thiết lập</label>
+    <input type="radio" name="tab" id="t-hand"><label for="t-hand">Điều khiển bằng tay</label>
+  </fieldset>
+</header>
+<main>
+  <section id="p-talk"><fieldset class="session" data-lock>
+  <label>Session Claude Code <select class="sel" id="session"><option value="">Không chọn session</option><option selected>polish-open-iris (đang chạy)</option><option>open-iris (chưa chạy)</option></select></label>
+  <button class="btn btn--icon" type="button" id="refresh" aria-label="Tải lại danh sách session" title="Tải lại danh sách session"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3h-3"/></svg></button>
+  <button class="btn" type="button" id="save-session" aria-pressed="true" title="Lưu session này làm mặc định cho lần mở sau">Mặc định</button>
+</fieldset>
+<div class="log" id="log" tabindex="0" aria-label="Hội thoại">
+  <div class="empty">chưa có hội thoại</div>
+  <div class="line you">you: Iris ơi, Claude Code đang làm gì?</div>
+  <div class="line">iris: Claude Code vừa trả lời xong, đang chờ bạn giao việc tiếp.</div>
+  <div class="line you">you: Đọc lại câu trả lời gần nhất giúp mình.</div>
+  <div class="line">iris: Bản tóm tắt: đã sửa xong màn hình chính, còn hai việc đang mở.</div>
+</div></section>
+  <section id="p-set" class="scroll"><fieldset data-lock>
+  <label class="row">Ngôn ngữ <select class="sel" id="lang"><option selected>Tiếng Việt</option><option>English</option></select></label>
+  <label class="row">Mô hình <select class="sel" id="model"><option selected>gemini-3.8-live</option><option>gemini-3.8-live-extended-thinking</option><option>gemini-3.1-flash-live-preview (legacy)</option></select></label>
+  <label class="row">Giọng nói <select class="sel" id="voice"><option>Zephyr</option><option>Puck</option><option>Charon</option><option selected>Kore</option><option>Fenrir</option><option>Aoede</option><option>Leda</option><option>Orus</option></select></label>
+</fieldset><h2>Công cụ</h2><fieldset class="tools" id="tools" data-lock>
+  <label class="switch"><input type="checkbox" role="switch" name="task_status" checked> task_status</label>
+  <label class="switch"><input type="checkbox" role="switch" name="task_result" checked> task_result</label>
+  <label class="switch"><input type="checkbox" role="switch" name="task_history" checked> task_history</label>
+  <label class="switch"><input type="checkbox" role="switch" name="do_task"> do_task</label>
+  <label class="switch"><input type="checkbox" role="switch" name="task_steer"> task_steer</label>
+  <label class="switch"><input type="checkbox" role="switch" name="task_stop"> task_stop</label>
+  <label class="switch"><input type="checkbox" role="switch" name="task_clear"> task_clear</label>
+  <small class="note">Thay đổi có hiệu lực từ lần Bắt đầu kế tiếp.</small>
+</fieldset></section>
+  <section id="p-hand" class="scroll"><h2>Quyền macOS</h2><div id="perms">
+  <div class="perm-actions">Cấp quyền cho app: <b id="host-app">Orca</b> <button class="btn" type="button" id="host-reveal">Hiện trong Finder</button></div>
+  <div class="perm denied"><div><b>Accessibility</b><small>điều khiển chuột: move, click, scroll</small></div><span class="state">denied</span><button class="btn" type="button">Mở cài đặt</button></div>
+  <div class="perm granted"><div><b>Camera</b><small>nhận diện tay (HUD)</small></div><span class="state">granted</span><span></span></div>
+  <div class="perm granted"><div><b>Microphone</b><small>voice (Gemini)</small></div><span class="state">granted</span><span></span></div>
+  <div class="perm-actions"><button class="btn" type="button" id="perm-request">Xin quyền</button> <button class="btn" type="button" id="perm-guide">Hướng dẫn</button> <button class="btn" type="button" id="perm-refresh">Kiểm tra lại</button></div>
+</div><h2>Điều khiển bằng tay</h2><div>
+  <label class="row">Di chuột <select class="sel" id="mode"><option>Tuyệt đối (tay ở đâu, chuột ở đó)</option><option>Trackpad (đẩy tay, nắm tay = nhấc)</option></select></label>
+  <label class="row">Tay điều khiển <select class="sel" id="side"><option>Tay phải</option><option>Tay trái</option></select></label>
+  <label class="row">Vùng tay <span class="with"><input id="span" type="range" min="0.2" max="1" step="0.05" value="0.6"> <small>60% khung camera = cả màn hình</small></span></label>
+  <label class="row row--check"><input id="camera" type="checkbox"> Hiện camera trên HUD (⌃⌥C)</label>
+</div></section>
+</main>
+<p class="error" id="error" role="alert" hidden></p>
+<footer class="run"><button class="btn btn--primary" type="button" id="toggle">Bắt đầu</button> <button class="btn" type="button" id="mute" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="6" y="1.5" width="4" height="8" rx="2"/><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5"/></svg> Mic</button> <span class="status" id="status" role="status">Chưa chạy</span> <button class="btn" type="button" id="folder" title="Mở thư mục mẫu hiệu ứng">Mẫu hiệu ứng</button> <button class="btn" type="button" id="hud" disabled title="Cần quyền Accessibility và Camera">Vào HUD</button></footer>
+<script>
+const $ = (s) => document.querySelector(s);
+$("#toggle").onclick = () => {
+  const on = document.body.dataset.state === "offline";
+  document.body.dataset.state = on ? "listening" : "offline";
+  $("#toggle").textContent = on ? "Dừng" : "Bắt đầu";
+  $("#status").textContent = on ? "Đang nghe" : "Chưa chạy";
+  $("#mute").disabled = !on;
+  document.querySelectorAll("[data-lock]").forEach((f) => (f.disabled = on));
+};
+</script>

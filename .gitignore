@@ -1,0 +1,9 @@
+node_modules
+.env
+.claude/skills/setup-excalidraw-live-multiagent/state/
+*.excalidraw.log.jsonl
+models/
+.claude/excalidraw-live/state/
+src/gesture/.build
+.excalidraw-live/
+out/

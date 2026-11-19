@@ -1,0 +1,129 @@
+<!doctype html>
+<!-- UI language: Vietnamese text here, English in data-en / data-en-title / data-en-aria-label (renderer.js setLang). -->
+<html lang="vi">
+<meta charset="utf-8" />
+<meta name="color-scheme" content="light dark" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' file:" />
+<title>Iris</title>
+<link rel="stylesheet" href="style.css" />
+<header id="top">
+  <h1>Iris</h1>
+  <fieldset id="tabs"><legend class="visually-hidden" data-en="Sections">Khu vực</legend>
+    <input type="radio" name="tab" id="t-talk" checked /><label for="t-talk" data-en="Conversation">Hội thoại</label>
+    <input type="radio" name="tab" id="t-set" /><label for="t-set" data-en="Settings">Thiết lập</label>
+    <input type="radio" name="tab" id="t-feat" /><label for="t-feat" data-en="Features">Tính năng</label>
+  </fieldset>
+</header>
+<main>
+<!-- Conversation first: the session to talk to, then the log fills the window. -->
+<section id="p-talk">
+  <div id="session-row" hidden><label><span data-en="Claude Code session">Session Claude Code</span> <select id="session"></select></label> <button id="refresh" aria-label="Tải lại danh sách session" title="Tải lại danh sách session" data-en-aria-label="Reload the session list" data-en-title="Reload the session list">↻</button> <button id="save-session" aria-label="Lưu session này làm mặc định" title="Lưu session này làm mặc định cho lần mở sau" data-en-aria-label="Save this session as the default" data-en-title="Save this session as the default for next launch">★</button></div>
+  <pre id="log" tabindex="0" aria-label="Hội thoại" data-en-aria-label="Conversation"></pre>
+</section>
+<section id="p-set" class="scroll">
+  <label class="row"><span data-en="Language">Ngôn ngữ</span> <select id="lang"></select></label>
+  <label class="row"><span data-en="Model">Mô hình</span> <select id="model"></select></label>
+  <label class="row"><span data-en="Voice">Giọng nói</span> <select id="voice"></select></label>
+  <!-- Input devices (devices.js): mic for the voice, camera for hand control. Both apply at once. -->
+  <label class="row"><span lang="en">Micro</span> <select id="mic"></select></label>
+  <label class="row"><span lang="en">Camera</span> <select id="cam"></select></label>
+  <p class="more"><small data-en="The mic is for the voice, the camera for hand control. Changes apply at once.">Micro dùng cho giọng nói, camera dùng cho điều khiển bằng tay. Đổi là có hiệu lực ngay.</small></p>
+  <div class="perm-actions"><button id="welcome-open" data-en="Check setup">Kiểm tra cài đặt</button> <small data-en="Key, permissions, tools on this Mac">Key, quyền, công cụ trên máy</small></div>
+  <h2 lang="en">Agent Tools</h2>
+  <fieldset id="tools"><small data-en="Changes take effect at the next Start.">Thay đổi có hiệu lực từ lần Bắt đầu kế tiếp.</small></fieldset>
+  <!-- Advanced Tools, off by default: voice coding through Orca CLI + Claude Code. Locked while either CLI is missing. -->
+  <h2 lang="en">Advanced Tools</h2>
+  <label class="feature"><input id="coding" type="checkbox" role="switch" disabled /> <span><span data-en="Claude Code: hand coding tasks over by voice">Claude Code: giao việc lập trình bằng giọng nói</span> <small id="coding-why" data-en="needs Orca CLI and Claude Code; off by default">cần Orca CLI và Claude Code; tắt sẵn</small></span></label>
+  <div id="coding-box" hidden>
+    <fieldset id="coding-tools"></fieldset>
+    <small data-en="Then pick a session in the Conversation tab. Takes effect at the next Start.">Bật xong, chọn session ở tab Hội thoại. Có hiệu lực từ lần Bắt đầu kế tiếp.</small>
+  </div>
+  <!-- Owner prompt and skills (persona.mjs): read at connect, like the tool switches. -->
+  <h2 data-en="Owner">Chủ nhân</h2>
+  <p class="more"><small data-en="~/.open-iris/IRIS.md: who you are, what Iris calls you, your preferences. Sent to Gemini at every Start, so no passwords. Takes effect at the next Start.">~/.open-iris/IRIS.md: bạn là ai, Iris gọi bạn thế nào, sở thích. Gửi cho Gemini mỗi lần Bắt đầu, đừng ghi mật khẩu. Có hiệu lực từ lần Bắt đầu kế tiếp.</small></p>
+  <textarea id="owner" rows="6" maxlength="2000" aria-label="Lời dặn cho Iris (IRIS.md)" data-en-aria-label="Notes for Iris (IRIS.md)"></textarea>
+  <div class="perm-actions"><button id="owner-save" data-en="Save">Lưu</button> <small id="owner-state" role="status"></small></div>
+  <h2 lang="en">Skills</h2>
+  <fieldset id="skills"><small data-en="~/.open-iris/skills/&lt;name&gt;/SKILL.md (frontmatter name, description). Takes effect at the next Start; new skills show up after reopening the app.">~/.open-iris/skills/&lt;tên&gt;/SKILL.md (frontmatter name, description). Có hiệu lực từ lần Bắt đầu kế tiếp; skill mới hiện ra sau khi mở lại app.</small></fieldset>
+  <div class="perm-actions"><button id="skills-open" data-en="Open the skills folder">Mở thư mục skills</button></div>
+</section>
+<!-- Features run on their own, with or without the voice session; each one gets its own switch. -->
+<section id="p-feat" class="scroll">
+  <h2 lang="en">Hand Task Vision</h2>
+  <label class="feature"><input id="vision" type="checkbox" role="switch" disabled /> <span><span data-en="Control the mouse with your hand through the camera">Điều khiển chuột bằng tay qua camera</span> <small data-en="⌃⌥Q turns it off">⌃⌥Q tắt</small></span></label>
+  <label class="row"><span data-en="Pointer">Di chuột</span> <select id="mode"><option value="absolute" data-en="Absolute (the pointer follows your hand)">Tuyệt đối (tay ở đâu, chuột ở đó)</option><option value="trackpad" data-en="Trackpad (push your hand, fist = lift)">Trackpad (đẩy tay, nắm tay = nhấc)</option></select></label>
+  <label class="row"><span data-en="Hand">Tay điều khiển</span> <select id="side"><option value="right" data-en="Right hand">Tay phải</option><option value="left" data-en="Left hand">Tay trái</option></select></label>
+  <label class="row" id="span-row"><span data-en="Hand area">Vùng tay</span> <span class="with"><input id="span" type="range" min="0.2" max="1" step="0.05" /> <small id="span-text"></small></span></label>
+  <p class="more"><a id="guide-link" href="../gesture/guide.html" target="_blank" data-en="Gesture guide">Hướng dẫn cử chỉ</a></p>
+  <h2 lang="en">Gallery View</h2>
+  <label class="feature"><input id="gallery-on" type="checkbox" role="switch" checked /> <span><span data-en="Browse folders and images by hand">Xem thư mục, ảnh bằng tay</span> <small data-en="open it with the Gallery button below; dropping a folder or image on the window opens it too">mở bằng nút Gallery ở dưới; kéo thư mục hoặc ảnh vào cửa sổ cũng mở</small></span></label>
+  <p class="more"><a id="gallery-guide-link" href="../gesture/gallery-guide.html" target="_blank" data-en="Gallery View guide">Hướng dẫn Gallery View</a></p>
+  <!-- Livestream (main.mjs, livestream.mjs): co-host prompt + topic and the spoken recap, read at connect. Listen-only is the 👂 button next to Mic. -->
+  <h2 lang="en">Livestream</h2>
+  <label class="feature"><input id="cohost" type="checkbox" role="switch" /> <span><span data-en="Livestream co-host">Đồng dẫn livestream</span> <small data-en="short 1–3 sentence answers so the stream keeps moving; takes effect at the next Start">trả lời ngắn 1–3 câu cho live chạy liền mạch; có hiệu lực từ lần Bắt đầu kế tiếp</small></span></label>
+  <div id="live-box" hidden>
+    <div class="topic"><input id="live-topic" type="text" maxlength="200" aria-label="Chủ đề buổi live" data-en-aria-label="Livestream topic" placeholder="Chủ đề buổi live, ví dụ: Dựng app Electron với Gemini Live" data-en-placeholder="Livestream topic, e.g. Building an Electron app with Gemini Live" /> <button id="topic-save" data-en="Save">Lưu</button></div>
+    <small id="topic-state" role="status"></small>
+    <label class="feature"><input id="recap" type="checkbox" role="switch" /> <span><span data-en="Recap every 5 minutes">Tóm tắt mỗi 5 phút</span> <small data-en="after 4 seconds of quiet, Iris recaps what was said, restates the topic for new viewers and asks them to engage">chờ lúc 4 giây không ai nói, Iris nói lại nội dung vừa rồi, nhắc chủ đề cho người mới vào và mời tương tác</small></span></label>
+  </div>
+  <!-- macOS permissions for the whole app: Hand Task Vision (Accessibility, Camera) and voice (Microphone). -->
+  <h2 data-en="macOS permissions">Quyền macOS</h2>
+  <fieldset id="perms">
+    <div class="perm-actions"><span data-en="Grant permissions to:">Cấp quyền cho app:</span> <b id="host-app">…</b> <button id="host-reveal" data-en="Show in Finder">Hiện trong Finder</button></div>
+    <div class="perm-actions"><button id="perm-request" data-en="Request">Xin quyền</button> <button id="perm-guide" data-en="How to">Hướng dẫn</button> <button id="perm-refresh" data-en="Check again">Kiểm tra lại</button></div>
+  </fieldset>
+  <p id="perm-hint" hidden></p>
+</section>
+<!-- Hand Task Vision camera: picture-in-picture in the bottom-right corner on every tab while vision is on. -->
+<div id="hv-view" class="camera-frame" hidden>
+  <video id="hv-cam" autoplay muted playsinline></video>
+  <canvas id="hv-bones" width="640" height="480"></canvas>
+  <span id="hv-status"></span>
+  <span id="hv-pose" role="status"></span>
+  <button id="hv-hide" aria-pressed="false" title="Thu gọn camera thành 1 dòng / mở lại" data-en-title="Collapse the camera to one line / expand it">▾</button>
+</div>
+</main>
+<p id="error" role="alert" hidden></p>
+<footer id="run"><button id="toggle">Bắt đầu</button> <button id="mute" disabled>🎤 Mic</button> <button id="listen" disabled aria-pressed="false" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂 Chỉ nghe</button> <button id="gallery-open" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼 Gallery</button><span id="status" role="status" data-state="offline">Chưa chạy</span> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label> <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" title="Hướng dẫn HUD: các nút, phím tắt" data-en-title="HUD guide: buttons, shortcuts" aria-label="Hướng dẫn HUD" data-en-aria-label="HUD guide">?</a></footer>
+<dialog id="ask" aria-labelledby="ask-title">
+  <h2 id="ask-title"></h2>
+  <form method="dialog"><button value="" data-en="Cancel">Huỷ</button> <button value="ok" autofocus data-en="Open">Mở</button></form>
+</dialog>
+<!-- Welcome / setup check (welcome.js): first launch, or Thiết lập → Kiểm tra cài đặt. Missing pieces only lock their feature. -->
+<dialog id="welcome" aria-labelledby="w-title">
+  <div class="w-dots"><i></i><i></i><i></i><i></i><i></i></div>
+  <section data-step="0">
+    <h2 id="w-title" data-en="Welcome to Iris">Chào mừng đến Iris</h2>
+    <p data-en="Iris controls your Mac by voice and by hand, and talks to Claude Code through Orca.">Iris điều khiển máy Mac bằng giọng nói và bàn tay, và nói chuyện với Claude Code qua Orca.</p>
+    <p><small data-en="A few checks first, about 2 minutes. A step not done only locks its feature; the rest still works.">Vài bước kiểm tra trước khi dùng, khoảng 2 phút. Bước nào chưa xong thì tính năng đó tạm khoá, bạn vẫn dùng được phần còn lại.</small></p>
+  </section>
+  <section data-step="1" hidden>
+    <h2 data-en="1. Gemini API key">1. Gemini API key</h2>
+    <p><small data-en="Voice runs on Gemini Live. The key is kept in ~/.open-iris/.env and sent only to Google.">Giọng nói chạy bằng Gemini Live. Key lưu trong ~/.open-iris/.env, chỉ gửi tới Google.</small></p>
+    <input id="w-key" type="password" placeholder="AIza…" autocomplete="off" aria-label="Gemini API key" />
+    <div class="perm-actions"><button id="w-key-save" data-en="Save and check">Lưu và kiểm tra</button> <span id="w-key-st" role="status"></span></div>
+    <small data-en="No key yet? Get one free at aistudio.google.com/apikey. You can skip: then only hand control works.">Chưa có key? Lấy miễn phí tại aistudio.google.com/apikey. Bỏ qua được: khi đó chỉ dùng bàn tay.</small>
+  </section>
+  <section data-step="2" hidden>
+    <h2 data-en="2. macOS permissions">2. Quyền macOS</h2>
+    <div id="w-perms"></div>
+    <small id="w-perm-note"></small>
+  </section>
+  <section data-step="3" hidden>
+    <h2 data-en="3. Tools on this Mac">3. Công cụ trên máy</h2>
+    <div id="w-clis"></div>
+  </section>
+  <section data-step="4" hidden>
+    <h2 data-en="Ready">Sẵn sàng</h2>
+    <div id="w-caps"></div>
+    <h2 data-en="Try it">Thử ngay</h2>
+    <ol id="w-tut"></ol>
+    <small data-en="Open this check again: Settings → Check setup.">Mở lại bước kiểm tra này: Thiết lập → Kiểm tra cài đặt.</small>
+  </section>
+  <div class="w-nav"><button id="w-back" data-en="← Back">← Quay lại</button> <button id="w-next" class="cta"></button></div>
+</dialog>
+<script src="renderer.js"></script>
+<script src="welcome.js"></script>
+<script src="../gesture/setup.js"></script>
+<script type="module" src="../gesture/engine.js"></script>
+<script type="module" src="devices.js"></script>

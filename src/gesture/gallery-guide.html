@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- Vietnamese in the markup, English in data-en; the main window links here with ?lang=en|vi. Gestures mirror gesture/hud-ui.js. -->
+<html lang="vi">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hướng dẫn Gallery View</title>
+<style>
+  :root { --bg: #f5f0e8; --card: #faf9f5; --text: #141413; --muted: #6c6a64; --line: #e6dfd8; --accent: #1f6fbf; --on-accent: #fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #181715; --card: #252320; --text: #faf9f5; --muted: #a09d96; --line: #3a3733; --accent: #2f8fe0; --on-accent: #181715; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 Inter, system-ui, -apple-system, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font: 400 28px/1.2 Copernicus, "Tiempos Headline", Georgia, serif; letter-spacing: -0.3px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .steps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding: 0; list-style: none; counter-reset: s; }
+  .steps li { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; counter-increment: s; }
+  .steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 6px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 17px; font-weight: 500; margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: start; vertical-align: top; padding: 6px 8px; border-top: 1px solid var(--line); }
+  th { font-weight: 500; }
+  b { color: var(--accent); }
+</style>
+<main>
+  <h1 data-en="🖼 Gallery View by hand">🖼 Gallery View bằng tay</h1>
+  <p class="sub" data-en='Browse folders and images as a 3D ring of cards. Click, double-click, scroll and right click are done as in the <a href="guide.html">gesture guide</a>; only two-hand zoom is new.'>Xem thư mục và ảnh dạng vòng thẻ 3D. Click, double-click, cuộn, chuột phải làm như trong <a href="guide.html">hướng dẫn cử chỉ</a>; chỉ có zoom hai tay là cử chỉ mới.</p>
+  <ol class="steps">
+    <li data-en="<b>Gallery View</b> is on by default (switch it off in Features)"><b>Gallery View</b> bật sẵn (tắt trong Tính năng)</li>
+    <li data-en="Press <b>🖼</b> on the HUD (opens ~/), or drop a folder / image on the window">Bấm <b>🖼</b> trên HUD (mở ~/), hoặc kéo thư mục / ảnh vào cửa sổ</li>
+  </ol>
+
+  <section class="card">
+    <h2 data-en="🙌 Two-hand zoom (gallery only)">🙌 Zoom hai tay (chỉ có trong gallery)</h2>
+    <ul>
+      <li data-en="Show <b>both hands open ✋</b>, then move them apart to zoom in, together to zoom out (1× – 6×).">Đưa <b>cả hai tay mở ✋</b> vào camera, kéo ra để phóng to, chụm lại để thu nhỏ (1× – 6×).</li>
+      <li data-en="Works on the card ring and in the image viewer.">Dùng được ở vòng thẻ và khi xem ảnh lớn.</li>
+      <li data-en="While two hands are in view the mouse <b>freezes</b>, so zooming never clicks. Take one hand away and the zoom stays.">Khi có hai tay trong khung, chuột <b>đứng yên</b> nên zoom không click nhầm. Rút một tay ra thì giữ nguyên mức zoom.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2 data-en="What the usual gestures do here">Cử chỉ quen thuộc làm gì ở đây</h2>
+    <table>
+      <tr><th></th><th data-en="Card ring">Vòng thẻ</th><th data-en="Image viewer">Xem ảnh lớn</th></tr>
+      <tr><th data-en="✌ Scroll">✌ Cuộn</th><td data-en="Turn the ring, one card at a time">Xoay vòng, từng thẻ một</td><td data-en="Pan the zoomed image">Kéo ảnh đã zoom</td></tr>
+      <tr><th>Click</th><td data-en="Bring the card to the front">Đưa thẻ ra giữa</td><td>–</td></tr>
+      <tr><th>Double-click</th><td data-en="Open: image → viewer, folder → go in, other file → its macOS app">Mở: ảnh → xem lớn, thư mục → vào trong, file khác → app macOS của nó</td><td>–</td></tr>
+      <tr><th data-en="Right click">Chuột phải</th><td data-en="Nothing (only ✕ closes the gallery)">Không làm gì (chỉ ✕ mới đóng gallery)</td><td data-en="Back to the ring">Quay lại vòng thẻ</td></tr>
+      <tr><th>⬆ / ✕</th><td data-en="Parent folder / close">Lên thư mục cha / đóng</td><td>–</td></tr>
+      <tr><th data-en="🎤 Voice">🎤 Giọng nói</th><td>–</td><td data-en="Tell Iris what to do with &quot;this image&quot;">Nói với Iris muốn làm gì với "ảnh này"</td></tr>
+    </table>
+  </section>
+</main>
+<script>
+if (new URLSearchParams(location.search).get("lang") === "en") {
+  document.documentElement.lang = "en";
+  document.title = "Gallery View guide";
+  for (const el of document.querySelectorAll("[data-en]")) el.innerHTML = el.dataset.en;
+}
+for (const a of document.querySelectorAll('a[href="guide.html"]')) a.search = location.search; // same language as this page
+</script>
+</html>

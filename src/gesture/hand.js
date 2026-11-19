@@ -1,0 +1,116 @@
+// Pure gesture math on MediaPipe hand landmarks (21 points, x/y normalized 0..1).
+// Shared by the renderer and hand.test.mjs.
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+
+// Cursor follows the index knuckle (5), not the fingertip: the knuckle barely moves when you pinch, so clicks don't drift.
+// `span`: the centred share of the camera frame that maps to the whole screen. Smaller = less arm travel, more jitter.
+export function cursorFrom(lm, span = 0.6) {
+  const p = lm[5];
+  const map = (v) => clamp01((v - (1 - span) / 2) / span);
+  return { x: map(1 - p.x), y: map(p.y) }; // mirror x so moving your hand right moves the cursor right
+}
+
+// One Euro filter (Casiez 2012): heavy smoothing when the hand is still (kills jitter), light when it moves fast (no lag).
+// t in ms. minCutoff (Hz): lower = steadier at rest. beta: higher = less lag when moving. Speeds are screen widths/s.
+export function smooth(prev, next, t, minCutoff = 0.7, beta = 10) {
+  if (!prev?.t || t <= prev.t) return { x: next.x, y: next.y, vx: 0, vy: 0, t };
+  const dt = (t - prev.t) / 1000;
+  const alpha = (cutoff) => 1 / (1 + 1 / (2 * Math.PI * cutoff * dt));
+  const av = alpha(1);
+  const vx = prev.vx + av * ((next.x - prev.x) / dt - prev.vx);
+  const vy = prev.vy + av * ((next.y - prev.y) / dt - prev.vy);
+  const a = alpha(minCutoff + beta * Math.hypot(vx, vy));
+  return { x: prev.x + a * (next.x - prev.x), y: prev.y + a * (next.y - prev.y), vx, vy, t };
+}
+
+// Thumb tip (4) to a fingertip (8 index = left button, 12 middle = right click), scaled by hand size (wrist 0 → middle knuckle 9) so distance from camera doesn't matter.
+// Two thresholds (hysteresis) so a pinch near the edge doesn't flicker down/up.
+export const pinchRatio = (lm, tip = 8) => dist(lm[4], lm[tip]) / dist(lm[0], lm[9]);
+
+const PINCH_ON = 0.25; // was 0.30/0.45: fingers visibly apart still counted as pinched
+const PINCH_OFF = 0.33;
+export function isPinched(lm, wasPinched, tip = 8) {
+  const d = pinchRatio(lm, tip);
+  return wasPinched ? d < PINCH_OFF : d < PINCH_ON;
+}
+
+// 0 = fingers relaxed apart (ratio ≥ 0.6), 1 = at the pinch threshold. Drives the shrinking ring.
+export const pinchApproach = (ratio) => clamp01((0.6 - ratio) / (0.6 - PINCH_ON));
+
+// A finger is extended when its tip is farther from the wrist than its middle joint.
+const extended = (lm, tip, pip) => dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]);
+
+// "V" pose (index + middle up, ring + pinky folded) switches to scroll mode.
+export const isScrollPose = (lm) =>
+  extended(lm, 8, 6) && extended(lm, 12, 10) && !extended(lm, 16, 14) && !extended(lm, 20, 18);
+
+// Trackpad mode: the cursor moves by the hand's motion (from → to, filtered hand points with t in ms), not its position.
+// Slow hand = ~1.5x (precise), fast hand = up to 5x (cross a big screen with a flick). Speeds in camera frames/s.
+export function trackpad(cursor, from, to) {
+  if (!from) return cursor; // hand just (re)appeared or was lifted: no jump
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const gain = Math.min(5, 1.5 + 1.5 * (Math.hypot(dx, dy) / ((to.t - from.t) / 1000 || 1)));
+  return { x: clamp01(cursor.x + dx * gain), y: clamp01(cursor.y + dy * gain) };
+}
+
+// Scroll inertia: after the V pose ends, keep scrolling at the last speed (px per frame) and slow down to a stop.
+export const GLIDE_MIN = 30; // slower than this when the pose ends = no glide, so slow precise scrolling stops dead
+export function glide(v, decay = 0.92) {
+  const n = { x: v.x * decay, y: v.y * decay };
+  return Math.hypot(n.x, n.y) < 1 ? null : n;
+}
+
+// Fist (all four fingers folded) = lift: the cursor stays put (trackpad mode: move the hand back without moving it).
+// Open ✋: all four fingers up and the thumb clear of index and middle (a pinch is not open). Two of these = gallery zoom.
+export const isOpen = (lm) =>
+  [[8, 6], [12, 10], [16, 14], [20, 18]].every(([tip, pip]) => extended(lm, tip, pip)) && pinchRatio(lm, 8) > PINCH_OFF && pinchRatio(lm, 12) > PINCH_OFF;
+
+export const isFist = (lm) => [[8, 6], [12, 10], [16, 14], [20, 18]].every(([tip, pip]) => !extended(lm, tip, pip));
+
+// Rock 🤘 (index + pinky up, middle + ring folded), held LOCK_HOLD_MS, toggles control. Unusual on purpose: never by accident.
+export const LOCK_HOLD_MS = 1500;
+export const isRock = (lm) => extended(lm, 8, 6) && !extended(lm, 12, 10) && !extended(lm, 16, 14) && extended(lm, 20, 18);
+
+// Click lock: while pinched, and for `hold` ms after letting go, the cursor stays on the click point unless the hand
+// moves past `radius` (screen fraction). Hand jitter otherwise turns a click into a drag and breaks double-clicks.
+export const CLICK_HOLD_MS = 500; // macOS default double-click interval
+export function clickLock(anchor, cursor, now, radius = 0.025) {
+  if (!anchor || now > anchor.until) return null;
+  return Math.hypot(cursor.x - anchor.x, cursor.y - anchor.y) < radius ? anchor : null;
+}
+
+// Pose debounce: the model misreads a held ✌ as ✋/🤏/✊ for single frames (~30-70ms), and each misread frame
+// used to fall into the click branch. Switch only after the new pose is seen POSE_FRAMES frames in a row.
+// s = { pose, next, count } from the previous frame, null after the hand was lost (then the first pose is taken as is).
+// Gallery ring (hud-ui.js). `turned` = cards turned, fractional while ✌ scrolls, not wrapped so it never spins the long way.
+// Under RING_SLOTS cards a full circle puts them back to back (2 cards = front + one hidden behind), so few cards sit on
+// an arc of RING_SLOTS-sized steps instead, and turning stops at the ends.
+export const RING_SLOTS = 6;
+export const ringTurn = (turned, d, n) => (n < RING_SLOTS ? Math.max(0, Math.min(n - 1, turned + d)) : turned + d);
+export const ringFront = (turned, n) => ((Math.round(turned) % n) + n) % n;
+// How far to turn to bring card i to the front: straight there on an arc, the shortest way round on a ring.
+export function ringTo(turned, i, n) {
+  if (n < RING_SLOTS) return i - turned;
+  let d = (i - ringFront(turned, n) + n) % n;
+  if (d > n / 2) d -= n;
+  return d;
+}
+
+export const POSE_FRAMES = 3; // ~100ms at 33ms frames
+export function settle(s, raw, frames = POSE_FRAMES) {
+  if (!s || raw === s.pose) return { pose: raw, next: raw, count: 0 };
+  const count = raw === s.next ? s.count + 1 : 1;
+  return count >= frames ? { pose: raw, next: raw, count: 0 } : { pose: s.pose, next: raw, count };
+}
+
+// ✌ scroll deadzone: the anchor stays put until the knuckle has moved SCROLL_DEAD of the frame, so camera noise on a
+// still hand (~0.002 → ±4px at gain 2000, flipping sign) scrolls nothing; a real move is sent whole once past it.
+export const SCROLL_DEAD = 0.006;
+export function scrollStep(anchor, p, dead = SCROLL_DEAD) {
+  if (!anchor) return { d: { x: 0, y: 0 }, anchor: p };
+  const d = { x: p.x - anchor.x, y: p.y - anchor.y };
+  return Math.hypot(d.x, d.y) < dead ? { d: { x: 0, y: 0 }, anchor } : { d, anchor: p };
+}

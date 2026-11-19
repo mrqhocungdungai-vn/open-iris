@@ -1,0 +1,159 @@
+/* Layout from .hallmark/proposals/a.html ("Hội thoại trước"): three tabs, the conversation fills the window, the Start row stays at the bottom.
+   Follows the system light/dark setting; tokens from DESIGN.md (warm cream, ocean blue from the icon, warm dark). */
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#faf9f5, #181715);
+  --card: light-dark(#f5f0e8, #252320); /* surface-soft: --muted text stays 4.5:1 on it */
+  --card-2: light-dark(#efe9de, #2f2c28); /* selected tab, pressed button */
+  --text: light-dark(#141413, #faf9f5);
+  --text-2: light-dark(#3d3d3a, #d9d5cc);
+  --muted: light-dark(#6c6a64, #a09d96);
+  --hair: light-dark(#e6dfd8, #3a3733); /* dividers and disabled fills */
+  --line: light-dark(#8e8b82, #6c6a64); /* control borders and switch track: 3:1 against --bg */
+  --accent: #2f8fe0; /* ocean blue (icon): focus ring, native range */
+  --cta: #1f6fbf; /* blue one step darker, so white button text reaches 4.5:1 */
+  --cta-2: #185a9c;
+  --on-cta: #fff;
+  --stage: #1f1e1b; --on-stage: #faf9f5; --on-stage-2: #a09d96; /* the conversation: dark in both themes */
+  --ok: #5db872; --wait: #d4a017; --bad: #c64545;
+  --ok-bg: light-dark(#c8e6c9, #1f4d2b); --bad-bg: light-dark(#ffcdd2, #5c1f24); --error-bg: light-dark(#fbeceb, #3a1f1d);
+  --serif: Copernicus, "Tiempos Headline", Georgia, ui-serif, serif;
+  accent-color: var(--accent);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; overflow-x: clip; }
+body { margin: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; font: 14px/1.45 Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+small { font-size: 12px; color: var(--muted); }
+h1, h2 { margin: 0; font-family: var(--serif); font-weight: 400; letter-spacing: -0.02em; line-height: 1.1; }
+h1 { font-size: 19px; }
+h2 { margin: 24px 0 4px; font-size: 17px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+[hidden] { display: none !important; }
+
+button, select { min-block-size: 36px; min-inline-size: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-weight: 500; cursor: pointer; }
+button { white-space: nowrap; }
+button:hover { background: var(--card); }
+button:active, button[aria-pressed="true"] { background: var(--card-2); }
+:is(button, select):disabled { border-color: var(--hair); background: var(--hair); color: var(--muted); cursor: not-allowed; }
+#toggle { min-width: 88px; }
+#toggle:enabled { border-color: transparent; background: var(--cta); color: var(--on-cta); }
+#toggle:enabled:hover { background: var(--cta-2); }
+#refresh, #save-session { padding: 0; }
+a { color: inherit; text-underline-offset: 0.16em; }
+
+/* Header: the name, then the tabs. Radio buttons, so the arrow keys move between tabs. */
+#top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#tabs { display: flex; gap: 4px; }
+#tabs input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+#tabs label { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border-radius: 8px; color: var(--muted); font-weight: 500; cursor: pointer; }
+#tabs input:checked + label { background: var(--card-2); color: var(--text); }
+#tabs input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+main { position: relative; flex: 1; min-height: 0; display: flex; }
+main > section { display: none; flex: 1; min-width: 0; min-height: 0; flex-direction: column; gap: 12px; }
+main > .scroll { overflow-y: auto; gap: 0; }
+body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-feat:checked) #p-feat { display: flex; }
+.scroll > h2:first-child { margin-top: 0; }
+
+/* Settings: one per line, name on the left, control on the right. */
+.row { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); align-items: center; gap: 12px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--hair); color: var(--text-2); }
+.row select { width: 100%; min-width: 0; }
+.row .with { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.more { margin: 8px 0 0; }
+#session-row { display: flex; gap: 8px; align-items: end; }
+#session-row label { flex: 1; min-width: 0; display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+#session-row select { width: 100%; }
+
+/* Agent Tools (rows built by renderer.js) and Features: a checkbox styled as an on/off switch (role="switch" keeps it accessible). */
+#tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+#tools small, #tools strong { grid-column: 1 / -1; }
+#tools strong { margin-top: 12px; font-weight: 500; color: var(--text-2); }
+#tools label, .feature { display: flex; align-items: center; gap: 8px; min-height: 36px; min-width: 0; overflow-wrap: anywhere; }
+.feature { min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--hair); font-weight: 500; }
+.feature small { font-weight: 400; }
+[role=switch] { appearance: none; flex: none; position: relative; width: 36px; height: 20px; margin: 0; border-radius: 999px; background: var(--line); cursor: pointer; transition: background-color 0.12s; }
+[role=switch]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); transition: transform 0.12s; }
+[role=switch]:checked { background: var(--text); }
+[role=switch]:checked::after { transform: translateX(16px); }
+[role=switch]:disabled { background: var(--hair); cursor: not-allowed; }
+:is(#tools label, #coding-tools label, .feature):has(:disabled) { color: var(--muted); }
+/* Settings › Advanced Tools › Claude Code: the coding tool switches, indented under its switch. */
+#coding-box { padding: 8px 0 0 44px; }
+/* Features › Livestream: topic and recap, indented under the co-host switch like #coding-box. */
+#live-box { padding: 8px 0 0 44px; }
+.topic { display: flex; gap: 8px; align-items: center; padding-bottom: 4px; }
+#live-topic { flex: 1; min-width: 0; min-block-size: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+#live-topic:disabled { border-color: var(--hair); background: var(--hair); color: var(--muted); }
+#coding-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 16px; } /* 220px: long tool names never break mid-word */
+#coding-tools label { display: flex; align-items: center; gap: 8px; min-height: 36px; min-width: 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { [role=switch], [role=switch]::after { transition: none; } }
+
+/* ⚙ Quyền macOS (rows built by gesture/setup.js): name, state, button; what it is for on the next line. */
+.perm { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 0; border-bottom: 1px solid var(--hair); }
+.perm b { font-weight: 500; }
+.perm button { margin-left: auto; }
+.perm small { flex-basis: 100%; }
+.perm .state { padding: 0 8px; border-radius: 999px; background: var(--hair); font-size: 12px; }
+.perm.granted .state { background: var(--ok-bg); }
+.perm.denied .state { background: var(--bad-bg); }
+#owner { width: 100%; min-height: 120px; margin-top: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+#skills { display: grid; }
+.perm-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 0; }
+#perm-hint { margin: 4px 0 0; color: var(--muted); }
+
+/* Conversation: the one dark surface, in both themes (DESIGN.md code-window-card). */
+#log { color-scheme: dark; flex: 1; min-height: 120px; margin: 0; padding: 16px; overflow-y: auto; white-space: pre-wrap; border-radius: 12px; background: var(--stage); color: var(--on-stage); font: inherit; line-height: 1.55; }
+#log:empty::before { content: "chưa có hội thoại"; color: var(--on-stage-2); font: 400 23px/1.2 var(--serif); letter-spacing: -0.02em; }
+:root:lang(en) #log:empty::before { content: "no conversation yet"; }
+#log .you, #log .sys { color: var(--on-stage-2); }
+#log .sys, #log .err { font-size: 12px; }
+#log .err { color: #e8907f; }
+
+/* Hand Task Vision camera: picture-in-picture in the bottom-right corner, 4:3, mirrored like a selfie,
+   status top-right and pose bottom-left as chips over the video. */
+#hv-view { position: absolute; right: 8px; bottom: 8px; z-index: 1; width: 200px; max-width: 45%; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: var(--stage); color: var(--on-stage); box-shadow: 0 0 0 1px rgb(250 249 245 / 0.14); font-size: 11px; }
+main:has(#hv-view:not([hidden])) :is(#log, .scroll) { padding-bottom: 166px; } /* the newest lines scroll clear of the camera */
+#hv-view video, #hv-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+#hv-status, #hv-pose { position: absolute; padding: 2px 8px; border-radius: 999px; background: rgb(0 0 0 / 0.6); }
+#hv-status { top: 6px; right: 6px; }
+#hv-pose { bottom: 6px; left: 6px; font-weight: 500; color: #6cc4ff; }
+#hv-status:empty, #hv-pose:empty { display: none; }
+#hv-hide { position: absolute; top: 4px; left: 4px; display: grid; place-items: center; min-block-size: 0; min-inline-size: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--on-stage); color: var(--stage); font-size: 22px; font-weight: 700; line-height: 1; }
+#hv-hide:hover { background: #fff; }
+/* Collapsed: one line (▴ · pose · status) so the page gets the space back. */
+#hv-view.mini { width: auto; max-width: calc(100% - 16px); aspect-ratio: auto; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 999px; }
+#hv-view.mini :is(video, canvas) { width: 1px; height: 1px; opacity: 0; } /* still on the page: the engine reads frames from the video */
+#hv-view.mini :is(#hv-hide, #hv-status, #hv-pose) { position: static; }
+main:has(#hv-view.mini:not([hidden])) :is(#log, .scroll) { padding-bottom: 44px; }
+
+/* Bottom row: Start, Mic, Gallery, the status with its dot, HUD. */
+#run { display: flex; gap: 8px; align-items: center; }
+#status { flex: 1; min-width: 0; color: var(--muted); }
+#status::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--line); }
+#status[data-state="connecting"]::before { background: var(--wait); }
+#status[data-state="listening"]::before { background: var(--ok); }
+#status[data-state="speaking"]::before { background: var(--accent); }
+#status:not([data-state="offline"]) { color: var(--text); font-weight: 500; }
+#hud-box { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+#hud-guide-link { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 12px; text-decoration: none; }
+#error { margin: 0; padding: 8px 12px; border: 1px solid var(--bad); border-radius: 8px; background: var(--error-bg); overflow-wrap: anywhere; }
+
+/* The "open this session?" dialog. */
+#ask { max-width: 360px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); }
+#ask h2 { margin: 0 0 12px; font: 600 14px/1.4 Inter, system-ui, sans-serif; letter-spacing: 0; overflow-wrap: anywhere; }
+#ask form { display: flex; justify-content: flex-end; gap: 6px; }
+#ask button { min-width: 64px; }
+dialog:modal { overscroll-behavior: contain; }
+dialog::backdrop { background: rgb(0 0 0 / 0.45); overflow: hidden; overscroll-behavior: contain; }
+/* Welcome / setup check (welcome.js). Rows reuse .perm. */
+#welcome { width: min(520px, calc(100vw - 32px)); padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); }
+#welcome h2:first-child { margin-top: 0; }
+#w-key { width: 100%; margin-top: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+.w-dots { display: flex; gap: 6px; margin-bottom: 16px; }
+.w-dots i { flex: 1; height: 4px; border-radius: 2px; background: var(--hair); }
+.w-dots i.on { background: var(--accent); }
+.w-nav { display: flex; justify-content: space-between; margin-top: 16px; }
+.w-nav .cta { margin-left: auto; border-color: transparent; background: var(--cta); color: var(--on-cta); }
+#w-tut li { margin-bottom: 6px; }

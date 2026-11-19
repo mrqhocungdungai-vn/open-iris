@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hướng dẫn cử chỉ</title>
+<style>
+  :root {
+    /* DESIGN.md tokens. --accent is the icon blue darkened to #1f6fbf in light mode so it reads 4.5:1 as text and under white. */
+    --bg: #f5f0e8; --card: #faf9f5; --text: #141413; --muted: #6c6a64; --line: #e6dfd8;
+    --cam: #181715; --desk: #3a6ea5; --accent: #1f6fbf; --on-accent: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #181715; --card: #252320; --text: #faf9f5; --muted: #a09d96; --line: #3a3733; --cam: #0f0e0d; --desk: #284f78; --accent: #2f8fe0; --on-accent: #181715; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 Inter, system-ui, -apple-system, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font: 400 28px/1.2 Copernicus, "Tiempos Headline", Georgia, serif; letter-spacing: -0.3px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .steps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; padding: 0; list-style: none; counter-reset: s; }
+  .steps li { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; counter-increment: s; }
+  .steps li::before { content: counter(s); display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 6px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 700; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 16px; }
+  @media (max-width: 500px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .card h2 { font-size: 17px; font-weight: 500; margin: 0; }
+  .card .how { color: var(--muted); margin: 2px 0 10px; font-size: 14px; }
+  .stage { display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; }
+  .stage svg { width: 100%; height: auto; display: block; border-radius: 10px; }
+  .cap { font-size: 11px; color: var(--muted); text-align: center; margin-top: 2px; }
+  .pose { margin-top: 8px; background: #181715; color: #6cc4ff; font: 500 13px ui-monospace, monospace; padding: 6px 10px; border-radius: 8px; min-height: 2.2em; }
+  .tip { margin: 8px 0 0; font-size: 14px; }
+  .tip b { color: var(--accent); }
+  ul.tips { margin: 8px 0 0; padding-left: 20px; }
+  ul.tips li { margin-bottom: 4px; }
+</style>
+<main>
+  <h1 data-en="✋ Control the mouse with your hand">✋ Điều khiển chuột bằng tay</h1>
+  <p class="sub" data-en='Use your right hand, palm facing the camera. The left picture is like the camera view in the HUD (green bones, red joints, <b style="color:#e6b800">yellow dot = pointer</b>), the right picture is the screen. The amber line is the exact text the HUD shows.'>Dùng tay phải, lòng bàn tay hướng về camera. Hình bên trái giống khung camera trong HUD (xương xanh, khớp đỏ, <b style="color:#e6b800">chấm vàng = con trỏ</b>), hình bên phải là màn hình. Dòng chữ màu hổ phách là đúng chữ HUD sẽ hiện.</p>
+  <ol class="steps">
+    <li data-en="Open the <b>open-iris</b> app (in dev: <code>pnpm dev</code> from Terminal)">Mở app <b>open-iris</b> (đang dev: <code>pnpm dev</code> từ Terminal)</li>
+    <li data-en="macOS permissions for <b>open-iris</b> (in dev: for the Terminal app): Accessibility + Camera = granted">Quyền macOS cho <b>open-iris</b> (đang dev: cho app Terminal): Accessibility + Camera = granted</li>
+    <li data-en="Turn on <b>Features › Hand Task Vision</b>">Bật <b>Tính năng › Hand Task Vision</b></li>
+    <li data-en="Hand control starts <b>OFF</b> (so it doesn't fight your real mouse): hold <b>🤘</b> (or press <kbd>⌃⌥G</kbd>) until you see <b>control ON</b> under the camera">Điều khiển bằng tay bắt đầu ở trạng thái <b>TẮT</b> (để không giành chuột thật): giữ <b>🤘</b> (hoặc bấm <kbd>⌃⌥G</kbd>) tới khi thấy <b>control ON</b> dưới camera</li>
+  </ol>
+  <div class="grid" id="grid"></div>
+  <div class="grid" style="margin-top:16px">
+    <section class="card">
+      <h2 data-en="💡 Tips">💡 Mẹo</h2>
+      <ul class="tips">
+        <li data-en="<b>Keep your wrist still when pinching</b>, only close the fingers. The pointer follows the yellow dot (base of the index finger), so it does not slip."><b>Giữ yên cổ tay khi chụm</b>, chỉ khép ngón. Con trỏ bám chấm vàng (gốc ngón trỏ) nên không bị trượt.</li>
+        <li data-en="<b>Small hand moves are enough</b>: the middle of the camera (minus a 20% border) already covers the whole screen."><b>Di tay nhỏ thôi</b>: vùng giữa camera (bỏ 20% viền) đã phủ cả màn hình.</li>
+        <li data-en="Sit <b>40–70cm</b> from the camera, with enough light to see the hand bones clearly.">Ngồi cách camera <b>40–70cm</b>, đủ sáng, thấy rõ xương tay.</li>
+        <li data-en="<code>index</code>/<code>middle</code> &lt; <b>0.25</b> means pinched, &gt; <b>0.33</b> means released.">Số <code>trỏ</code>/<code>giữa</code> &lt; <b>0.25</b> là đang chụm, &gt; <b>0.33</b> là đã nhả.</li>
+        <li data-en="Take your hand out of the camera → the mouse is released.">Rút tay khỏi camera → tự nhả chuột.</li>
+        <li data-en="<b>🤘 hold</b> (index + little finger up) until the bar fills = turn hand control on / off. Each time Hand Task Vision is switched on it starts <b>OFF</b>, so it never fights a real mouse."><b>Giữ 🤘</b> (giơ ngón trỏ + ngón út) tới khi đầy vạch = bật / tắt điều khiển bằng tay. Mỗi lần bật Hand Task Vision đều bắt đầu ở <b>TẮT</b>, để không giành với chuột thật.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+<script>
+// The main window links here with ?lang=en|vi, following its language select.
+const EN = new URLSearchParams(location.search).get("lang") === "en";
+const tr = (vi, en) => (EN ? en : vi);
+if (EN) {
+  document.documentElement.lang = "en";
+  document.title = "Gesture guide";
+  for (const el of document.querySelectorAll("[data-en]")) el.innerHTML = el.dataset.en;
+}
+// Same 21 MediaPipe landmarks and gesture rules as gesture/hand.js, so the labels match the HUD.
+const LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+const OPEN = [[100,200],[70,185],[50,160],[38,135],[30,112],[75,120],[70,85],[67,62],[65,40],[100,115],[100,78],[100,53],[100,30],[123,120],[127,86],[130,64],[132,45],[143,132],[152,108],[157,92],[161,76]];
+const pose = (changes) => OPEN.map((p, i) => changes[i] || p);
+const PINCH = pose({ 2: [55,165], 3: [48,140], 4: [50,120], 6: [68,95], 7: [60,110], 8: [52,118] });
+const RIGHT = pose({ 2: [58,165], 3: [52,142], 4: [62,122], 10: [95,90], 11: [80,110], 12: [64,121] });
+const VPOSE = pose({ 2: [68,175], 3: [65,155], 4: [75,140], 8: [55,40], 7: [61,62], 10: [106,78], 11: [111,53], 12: [115,30], 14: [128,95], 15: [124,110], 16: [118,118], 18: [150,115], 19: [145,128], 20: [138,134] });
+
+const mix = (a, b, k) => a.map((p, i) => [p[0] + (b[i][0] - p[0]) * k, p[1] + (b[i][1] - p[1]) * k]);
+const ease = (k) => k * k * (3 - 2 * k);
+// Piecewise curve through [time, value] points.
+function seg(t, pts) {
+  if (t <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    const [t1, v1] = pts[i], [t0, v0] = pts[i - 1];
+    if (t <= t1) return v0 + (v1 - v0) * ease((t - t0) / (t1 - t0));
+  }
+  return pts[pts.length - 1][1];
+}
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const ratio = (lm, tip) => dist(lm[4], lm[tip]) / dist(lm[0], lm[9]);
+const extended = (lm, tip, pip) => dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]);
+const isV = (lm) => extended(lm, 8, 6) && extended(lm, 12, 10) && !extended(lm, 16, 14) && !extended(lm, 20, 18);
+
+// --- drawing helpers for the fake desktop (viewBox 240x160) ---
+const cursorSvg = (x, y, color = "#fff") =>
+  `<path d="M0 0 L0 15 L4 11 L7 17 L9.5 16 L6.5 10 L12 10 Z" transform="translate(${x},${y})" fill="${color}" stroke="#000" stroke-width="1"/>`;
+const desk = (inner) => `<rect width="240" height="160" fill="var(--desk)"/><rect width="240" height="10" fill="rgba(255,255,255,.25)"/>${inner}`;
+const icon = (x, y, name, selected, kind = "folder") =>
+  `<g transform="translate(${x},${y})">${selected ? `<rect x="-6" y="-4" width="42" height="44" rx="5" fill="rgba(255,255,255,.3)"/>` : ""}` +
+  (kind === "folder"
+    ? `<path d="M0 6h11l3 3h16v20H0z" fill="#7cc1ff"/><path d="M0 11h30v18H0z" fill="#5aa9f5"/>`
+    : `<path d="M4 0h15l7 7v23H4z" fill="#f3f3f3"/><path d="M19 0v7h7" fill="#ccc"/>`) +
+  `<text x="15" y="38" text-anchor="middle" font-size="8" fill="#fff">${name}</text></g>`;
+const ripple = (x, y, age) => (age >= 0 && age < 400 ? `<circle cx="${x}" cy="${y}" r="${4 + age / 25}" fill="none" stroke="#ff0" stroke-width="2" opacity="${1 - age / 400}"/>` : "");
+
+const PROJECT = tr("Dự án", "Project"), NOTES = tr("ghi-chu", "notes");
+const DEMOS = [
+  {
+    title: tr("1. Di chuột", "1. Move the pointer"), how: tr("Mở bàn tay, di chuyển cả bàn tay.", "Open your hand and move the whole hand."), T: 4000,
+    tip: tr("Con trỏ đi theo <b>chấm vàng</b> (gốc ngón trỏ), không phải đầu ngón.", "The pointer follows the <b>yellow dot</b> (base of the index finger), not the fingertip."),
+    hand: (t) => { const a = (t / 4000) * Math.PI * 2; return { lm: OPEN, dx: 28 * Math.cos(a), dy: 14 * Math.sin(2 * a) }; },
+    screen: (t, st, c) => desk(icon(20, 20, PROJECT, false) + icon(20, 70, NOTES, false, "file")) + cursorSvg(c.x, c.y),
+  },
+  {
+    title: tr("2. Click trái (chọn)", "2. Left click (select)"), how: tr("Chụm ngón cái + ngón trỏ, rồi nhả.", "Pinch thumb + index finger, then release."), T: 3000,
+    tip: tr("Chụm là <b>nhấn</b>, nhả là <b>thả</b> chuột.", "Pinch is mouse <b>down</b>, release is mouse <b>up</b>."),
+    hand: (t) => ({ lm: mix(OPEN, PINCH, seg(t, [[0,0],[900,0],[1150,1],[1450,1],[1700,0]])), dx: 0, dy: 0 }),
+    base: { x: 115, y: 75 },
+    screen: (t, st, c) => desk(icon(100, 55, PROJECT, st.downs.length > 0)) + ripple(c.x, c.y, t - (st.downs[0] ?? -1e9)) + cursorSvg(c.x, c.y),
+  },
+  {
+    title: tr("3. Mở file / thư mục (double-click)", "3. Open a file / folder (double-click)"), how: tr("Chụm – nhả – chụm thật nhanh, giữ yên tay.", "Pinch – release – pinch quickly, keep your hand still."), T: 4200,
+    tip: tr("Hai lần chụm phải cách nhau <b>dưới 0,5 giây</b> và gần cùng một chỗ.", "The two pinches must be <b>under 0.5 seconds</b> apart, in about the same spot."),
+    hand: (t) => ({ lm: mix(OPEN, PINCH, seg(t, [[0,0],[800,0],[950,1],[1050,1],[1200,0],[1300,0],[1450,1],[1550,1],[1700,0]])), dx: 0, dy: 0 }),
+    base: { x: 115, y: 75 },
+    screen: (t, st, c) => {
+      const d = st.downs, gap = d.length >= 2 ? d[1] - d[0] : null, opened = gap !== null && gap < 500 && t < 3900;
+      const win = opened
+        ? `<g><rect x="30" y="22" width="180" height="120" rx="6" fill="#f4f5f7" stroke="#888"/><rect x="30" y="22" width="180" height="16" rx="6" fill="#dfe2e7"/>` +
+          `<circle cx="40" cy="30" r="3" fill="#ff5f57"/><circle cx="50" cy="30" r="3" fill="#febc2e"/><circle cx="60" cy="30" r="3" fill="#28c840"/>` +
+          `<text x="120" y="33" text-anchor="middle" font-size="8" fill="#333">${PROJECT}</text>` +
+          `<text x="120" y="90" text-anchor="middle" font-size="10" fill="#333">${tr("📂 Đã mở!", "📂 Opened!")}</text></g>`
+        : "";
+      const timer = gap !== null ? `<text x="120" y="155" text-anchor="middle" font-size="9" fill="#fff">${tr("2 lần chụm cách", "2 pinches")} ${Math.round(gap)} ms ${gap < 500 ? "✓ < 500" : "✗"}</text>` : "";
+      return desk(icon(100, 55, PROJECT, d.length > 0) + win + timer) + d.map((x) => ripple(c.x, c.y, t - x)).join("") + cursorSvg(c.x, c.y);
+    },
+  },
+  {
+    title: tr("4. Kéo thả / bôi đen", "4. Drag and drop / select text"), how: tr("Chụm cái + trỏ, giữ nguyên rồi di tay, nhả để thả.", "Pinch thumb + index, hold it while moving, release to drop."), T: 4500,
+    tip: tr("Đang kéo mà rút tay khỏi camera thì app <b>tự thả</b>.", "If your hand leaves the camera while dragging, the app <b>drops</b> it."),
+    hand: (t) => ({
+      lm: mix(OPEN, PINCH, seg(t, [[0,0],[600,0],[850,1],[3000,1],[3250,0]])),
+      dx: seg(t, [[0,0],[1000,0],[2700,36],[4000,36],[4500,0]]), dy: seg(t, [[0,0],[1000,0],[2700,-10],[4000,-10],[4500,0]]),
+    }),
+    base: { x: 45, y: 95 },
+    screen: (t, st, c) => {
+      if (st.pinched) st.file = { x: c.x - 15, y: c.y - 18 };
+      const f = st.file || { x: 30, y: 77 };
+      return desk(`<rect x="150" y="40" width="70" height="90" rx="6" fill="rgba(255,255,255,.15)" stroke="#fff" stroke-dasharray="4 3"/><text x="185" y="140" text-anchor="middle" font-size="8" fill="#fff">${tr("thư mục đích", "target folder")}</text>` + icon(f.x, f.y, NOTES, st.pinched, "file")) + cursorSvg(c.x, c.y);
+    },
+  },
+  {
+    title: tr("5. Chuột phải", "5. Right click"), how: tr("Chụm ngón cái + ngón giữa (ngón trỏ duỗi).", "Pinch thumb + middle finger (index finger straight)."), T: 3500,
+    tip: tr("Hiện menu: chọn <b>Open</b> bằng click trái nếu double-click khó.", "A menu shows: pick <b>Open</b> with a left click if double-click is hard."),
+    hand: (t) => ({ lm: mix(OPEN, RIGHT, seg(t, [[0,0],[900,0],[1150,1],[1400,1],[1650,0]])), dx: 0, dy: 0 }),
+    base: { x: 70, y: 60 },
+    screen: (t, st, c) => {
+      const menu = st.rights.length && t < 3300
+        ? `<g transform="translate(${c.x + 6},${c.y + 4})"><rect width="80" height="58" rx="5" fill="#f4f5f7" stroke="#999"/>` +
+          ["Open", "Get Info", "Rename", "Copy"].map((s, i) => `<text x="8" y="${14 + i * 13}" font-size="9" fill="#222">${s}</text>`).join("") + `</g>`
+        : "";
+      return desk(icon(55, 40, PROJECT, st.rights.length > 0) + menu) + ripple(c.x, c.y, t - (st.rights[0] ?? -1e9)) + cursorSvg(c.x, c.y);
+    },
+  },
+  {
+    title: tr("6. Cuộn", "6. Scroll"), how: tr("Giơ chữ V (trỏ + giữa duỗi, áp út + út gập), đưa tay lên / xuống.", "Make a V (index + middle straight, ring + little folded), move your hand up / down."), T: 4800,
+    tip: tr("Lúc cuộn con trỏ <b>đứng yên</b>, trang di chuyển theo tay. (Chiều cuộn chưa thử thật.)", "While scrolling the pointer <b>stays still</b> and the page follows your hand. (Scroll direction not tested for real yet.)"),
+    hand: (t) => ({
+      lm: mix(OPEN, VPOSE, seg(t, [[0,0],[500,1],[4300,1],[4700,0]])),
+      dx: 0, dy: seg(t, [[0,0],[700,0],[1700,-28],[2500,-28],[3500,18],[4100,18],[4700,0]]),
+    }),
+    base: { x: 120, y: 80 }, still: true,
+    screen: (t, st, c) => {
+      const off = st.scroll || 0;
+      const lines = Array.from({ length: 14 }, (_, i) => {
+        const y = 22 + i * 16 + off;
+        return y > 12 && y < 152 ? `<rect x="40" y="${y}" width="${i % 3 ? 160 : 110}" height="7" rx="3" fill="${i % 5 ? "#c9ced6" : "#7aa7e8"}"/>` : "";
+      }).join("");
+      return desk(`<rect x="30" y="14" width="180" height="140" rx="6" fill="#fff"/>${lines}`) + cursorSvg(c.x, c.y);
+    },
+  },
+];
+
+const grid = document.getElementById("grid");
+const NS = "http://www.w3.org/2000/svg";
+for (const d of DEMOS) {
+  const card = document.createElement("section");
+  card.className = "card";
+  card.innerHTML = `<h2>${d.title}</h2><p class="how">${d.how}</p>
+    <div class="stage"><div><svg viewBox="0 0 200 230" class="cam"></svg><div class="cap">Camera</div></div>
+    <div><svg viewBox="0 0 240 160" class="scr"></svg><div class="cap">${tr("Màn hình", "Screen")}</div></div></div>
+    <div class="pose"></div><p class="tip">💡 ${d.tip}</p>`;
+  grid.append(card);
+  Object.assign(d, { cam: card.querySelector(".cam"), scr: card.querySelector(".scr"), label: card.querySelector(".pose"), last: Infinity });
+}
+
+function newState() { return { pinched: false, right: false, downs: [], rights: [], scroll: 0, prevY: null, file: null }; }
+
+function frame(now) {
+  for (const d of DEMOS) {
+    const t = now % d.T;
+    if (t < d.last) d.st = newState();
+    d.last = t;
+    const st = d.st;
+    const { lm, dx, dy } = d.hand(t);
+    const r8 = ratio(lm, 8), r12 = ratio(lm, 12);
+
+    // Same decision order as gesture/engine.js.
+    let label;
+    if (isV(lm)) {
+      st.pinched = st.right = false;
+      if (st.prevY !== null) st.scroll += (dy - st.prevY) * 2.2;
+      st.prevY = dy;
+      label = tr("✌ V → cuộn", "✌ V → scroll");
+    } else {
+      st.prevY = null;
+      const p = st.pinched ? r8 < 0.33 : r8 < 0.25;
+      if (p && !st.pinched) st.downs.push(t);
+      st.pinched = p;
+      const r = !p && (st.right ? r12 < 0.33 : r12 < 0.25);
+      if (r && !st.right) st.rights.push(t);
+      st.right = r;
+      label = p ? tr("🤏 chụm trỏ → nhấn trái", "🤏 index pinch → left down") : r ? tr("🤏 chụm giữa → chuột phải", "🤏 middle pinch → right click") : tr("✋ mở → di chuột", "✋ open → move");
+    }
+    d.label.textContent = `${label} · ${tr("trỏ", "index")} ${r8.toFixed(2)} ${tr("giữa", "middle")} ${r12.toFixed(2)}`;
+
+    const base = d.base || { x: 120, y: 80 };
+    const c = d.still ? base : { x: base.x + dx * 2.6, y: base.y + dy * 2.6 };
+    d.scr.innerHTML = d.screen(t, st, c);
+
+    const pts = lm.map(([x, y]) => [x + dx, y + dy + 10]);
+    const tipLine = (tip, on) => `<line x1="${pts[4][0]}" y1="${pts[4][1]}" x2="${pts[tip][0]}" y2="${pts[tip][1]}" stroke="${on ? "#ff0" : "rgba(255,255,255,.35)"}" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+    d.cam.innerHTML =
+      `<rect width="200" height="230" fill="var(--cam)"/>` +
+      tipLine(8, st.pinched) + tipLine(12, st.right) +
+      LINKS.map(([a, b]) => `<line x1="${pts[a][0]}" y1="${pts[a][1]}" x2="${pts[b][0]}" y2="${pts[b][1]}" stroke="#0f0" stroke-width="3" stroke-linecap="round"/>`).join("") +
+      pts.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i === 5 ? 6 : 3.5}" fill="${i === 5 ? "#e6b800" : "#f33"}"/>`).join("");
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</html>
