@@ -283,6 +283,23 @@ assert.deepEqual(sent.map((s) => s[0]), [401_000]);
 await c.run(299);
 assert.equal(sent.length, 2); // the next recap is still on schedule: one pending turn per group, not a backlog
 
+// A tool call runs 10 s with no transcript (main.mjs send returns false while inFlight), then main marks activity
+// when the result goes back: the held turn waits 4 s more of quiet, so it does not cut Iris's answer to that result.
+sent = [];
+let busy = false;
+({ c, hk } = ticking({ recap: { on: true } }, (text) => (busy ? false : sent.push([c.now(), text]))));
+hk.start();
+await c.run(295);
+busy = true;
+await c.run(10);
+assert.equal(sent.length, 0);
+busy = false;
+hk.markActivity();
+await c.run(3);
+assert.equal(sent.length, 0);
+await c.run(2);
+assert.deepEqual(sent.map((s) => s[0]), [309_000]);
+
 // speak from UserTurn with no session is dropped, not queued for later.
 sent = [];
 const speakPlugin = parsePlugin("talk", { ...meta, name: "talk", fields: [] }, () => ({ hooks: { UserTurn: [{ name: "echo", hooks: [{ type: "speak", text: "Say hi." }] }] } }));

@@ -360,6 +360,7 @@ async function handleToolCalls(calls) {
     return { id, name, response: context ? { ...out, context } : out, ...(r.late && { willContinue: true }) };
   }));
   for (const { id } of calls) inFlight.delete(id);
+  h?.markActivity(); // Iris answers the result next: a speak held by the call waits for quiet again, so it never cuts that answer
   // A cancelled call's response is never sent, nor any response for a session that has ended since.
   const live = functionResponses.filter((f) => !cancelledCalls.delete(f.id));
   if (s !== session || !live.length) return;
