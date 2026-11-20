@@ -53,10 +53,17 @@ let sources = [];
 const meters = (window.irisMeters = { mic: null, out: null }); // orb-ui.js reads the voice levels
 
 async function startMic() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    // Settings › Micro (devices.js); a plain deviceId is "ideal", so an unplugged mic falls back to the default.
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, ...($("mic").value && { deviceId: $("mic").value }) },
-  });
+  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
+  const picked = $("mic").value; // Settings › Micro (devices.js)
+  let stream;
+  try {
+    // exact: an "ideal" deviceId lost to the system default, so a picked webcam mic was never used.
+    stream = await navigator.mediaDevices.getUserMedia({ audio: picked ? { ...audio, deviceId: { exact: picked } } : audio });
+  } catch (e) {
+    if (!picked || !["OverconstrainedError", "NotFoundError"].includes(e?.name)) throw e;
+    console.warn(`mic "${$("mic").selectedOptions[0]?.textContent}" not available (${e.name}), using the system default`);
+    stream = await navigator.mediaDevices.getUserMedia({ audio });
+  }
   document.dispatchEvent(new Event("devicesused")); // devices.js: labels are readable now
   // Gemini wants 16 kHz PCM; a 16 kHz context makes the browser resample the mic.
   const context = new AudioContext({ sampleRate: 16000 });

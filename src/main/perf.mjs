@@ -11,6 +11,24 @@ export function rms16(buf) {
 // shortcut: a fixed level, about -36 dBFS after the browser's noise suppression; calibrate per mic if V1 looks off.
 export const VOICE_RMS = 500;
 
+// Mic level for the log: feed(rms, now) per chunk returns { line, warn } every windowMs, else null.
+// warn is set once per meter (one session) when 30 s of mic never reached VOICE_RMS: a dead, muted or low-gain mic.
+export function micMeter(windowMs = 5000, warnMs = 30000) {
+  let first = null, start = 0, peak = 0, loud = 0, n = 0, everLoud = false, warned = false;
+  return (rms, now) => {
+    if (first === null) first = start = now;
+    peak = Math.max(peak, rms);
+    n++;
+    if (rms > VOICE_RMS) loud++, (everLoud = true);
+    if (now - start < windowMs) return null;
+    const line = `mic peakRms=${Math.round(peak)} voice=${loud}/${n}`;
+    const warn = !everLoud && !warned && now - first >= warnMs;
+    if (warn) warned = true;
+    start = now, peak = loud = n = 0;
+    return { line, warn };
+  };
+}
+
 // Nearest-rank percentile, p in 0..100.
 export function pct(values, p) {
   if (!values.length) return NaN;

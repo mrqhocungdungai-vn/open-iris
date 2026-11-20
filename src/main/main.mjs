@@ -16,7 +16,7 @@ import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput } from "./input.mjs";
 import { createResumer, freshSession, resumeNote } from "./resume.mjs";
-import { ago, rms16, VOICE_RMS } from "./perf.mjs";
+import { ago, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanName, cleanSkills, greeting, nameFor, loadPersona, loadSkills, personaBrief, savePersona, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
@@ -75,6 +75,7 @@ if (migrated) log("INFO", "app", `migrated GEMINI_API_KEY from ${repoEnv} to ${e
 let win = null;
 let session = null;
 let chunksIn = 0; // mic chunks sent this session
+let micLevel = micMeter(); // [perf] mic lines, new each Start
 let chunksOut = 0; // audio chunks received this turn
 // [perf] lines (docs/optimize-plan.md §1): V1 last voice -> first Iris audio, V2 toolCall -> toolResponse, V3 connect -> setupComplete.
 let perfConnect = null, lastVoiceAt = 0, lastHeardAt = 0;
@@ -167,6 +168,7 @@ async function connectLive(opts) {
   log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none"}`);
   chunksIn = 0;
   chunksOut = 0;
+  micLevel = micMeter();
   send("live:status", "connecting");
   const ai = new GoogleGenAI({ apiKey });
   let opened = false; // a reconnect is the same session: hooks keep running, SessionStart does not fire again
@@ -622,7 +624,11 @@ ipcMain.on("live:audio-in", (_e, arrayBuffer) => {
   if (!session || muted || !arrayBuffer?.byteLength) return;
   chunksIn++;
   const buf = Buffer.from(arrayBuffer);
-  if (rms16(buf) > VOICE_RMS) lastVoiceAt = Date.now();
+  const rms = rms16(buf), now = Date.now();
+  if (rms > VOICE_RMS) lastVoiceAt = now;
+  const lvl = micLevel(rms, now);
+  if (lvl) log("INFO", "perf", lvl.line);
+  if (lvl?.warn) log("WARN", "live", "mic: no voice-level sound in 30 s; check the mic, its gain, or Settings › Micro");
   try {
     session.sendRealtimeInput({
       audio: { data: buf.toString("base64"), mimeType: "audio/pcm;rate=16000" },

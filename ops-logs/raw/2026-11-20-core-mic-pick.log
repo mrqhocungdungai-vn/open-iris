@@ -1,0 +1,28 @@
+2026-11-20T13:05:34.106Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=53337
+2026-11-20T13:05:46.373Z [INFO] [devices] mic "HD Webcam C615 (046d:082c)"
+2026-11-20T13:05:48.023Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:05:57.441Z [DEBUG] [transcript] you: <redacted>
+2026-11-20T13:06:06.717Z [DEBUG] [transcript] you: <redacted>
+2026-11-20T13:07:10.310Z [DEBUG] [transcript] you: <redacted>
+2026-11-20T13:07:17.548Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=11182
+2026-11-20T13:14:38.514Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:14:39.355Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=95
+2026-11-20T13:14:41.274Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:14:42.277Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=113
+2026-11-20T13:14:44.018Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=283
+2026-11-20T13:14:46.130Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=528
+2026-11-20T13:14:47.183Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:15:38.308Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=6379
+2026-11-20T13:15:45.099Z [INFO] [devices] mic "C270 HD WEBCAM (046d:0825)"
+2026-11-20T13:15:46.597Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:16:27.361Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:16:59.842Z [INFO] [devices] mic "XOX K10 10th (2c04:607f)"
+2026-11-20T13:17:00.053Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:17:01.042Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=4175
+2026-11-20T13:17:03.364Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:18:08.208Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=8094
+2026-11-20T13:19:12.534Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:20:02.008Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=6174
+2026-11-20T13:20:03.128Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
+2026-11-20T13:20:20.018Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=2099
+2026-11-20T13:20:49.984Z [INFO] [renderer] mic started device="Default - XOX K10 10th (2c04:607f)" sampleRate=16000
