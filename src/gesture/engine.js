@@ -2,7 +2,7 @@
 // HUD closed. Camera + MediaPipe HandLandmarker → mouse events (hud.mjs → Swift helper). Each frame's state is also sent
 // to the HUD overlay (if open) for its cursor ring, pose line and camera skeleton.
 import { DrawingUtils, FilesetResolver, HandLandmarker } from "../../node_modules/@mediapipe/tasks-vision/vision_bundle.mjs";
-import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isThumbUp, isOpen, LOCK_HOLD_MS, pinchApproach, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
+import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isThumbUp, palmsOf, LOCK_HOLD_MS, pinchApproach, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
 import { deviceConstraint } from "../renderer/devices.js";
 
 const $ = (id) => document.getElementById(id);
@@ -150,7 +150,7 @@ function frame() {
   const res = landmarker.detectForVideo(video, performance.now());
   const lm = res.landmarks[res.handedness.findIndex((h) => h[0]?.categoryName === LABEL[side])];
   // Both palms (mirrored like the screen), for the HUD gallery's two-hand zoom; null unless both hands are open ✋.
-  palms = res.landmarks.length === 2 && res.landmarks.every(isOpen) ? res.landmarks.map((l) => ({ x: 1 - l[9].x, y: l[9].y })) : null;
+  palms = palmsOf(res.landmarks);
   // Here, not in the branches: every way out of the V pose (other pose, hand gone) starts the glide.
   const raw = !lm ? null : isThumbUp(lm) ? "thumb" : isFist(lm) ? "fist" : isRock(lm) ? "rock" : isScrollPose(lm) ? "scroll" : "move";
   poseState = raw && settle(poseState, raw);

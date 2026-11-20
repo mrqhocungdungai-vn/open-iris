@@ -143,6 +143,30 @@ test("thumbs up 👍 is a fist with the thumb pointing up; a tucked thumb or ope
   assert.equal(isThumbUp(lm), false);
 });
 
+test("two-hand zoom: only two open hands count, zoom follows the palm gap within 1×..max", async () => {
+  const { palmsOf, palmGap, zoomTarget } = await import("./hand.js");
+  const open = (x) => {
+    const lm = Array.from({ length: 21 }, () => ({ x, y: 0.5 }));
+    lm[0] = { x, y: 0.8 };
+    lm[9] = { x, y: 0.6 };
+    lm[4] = { x: x - 0.2, y: 0.6 }; // thumb out to the side: not a pinch
+    for (const [tip, pip] of [[8, 6], [12, 10], [16, 14], [20, 18]]) { lm[pip] = { x, y: 0.6 }; lm[tip] = { x, y: 0.4 }; }
+    return lm;
+  };
+  const fist = (x) => { const lm = open(x); for (const tip of [8, 12, 16, 20]) lm[tip] = { x, y: 0.7 }; return lm; };
+  assert.deepEqual(palmsOf([open(0.25), open(0.75)]), [{ x: 0.75, y: 0.6 }, { x: 0.25, y: 0.6 }]); // mirrored
+  assert.equal(palmsOf([open(0.3)]), null); // one hand
+  assert.equal(palmsOf([open(0.3), fist(0.7)]), null); // one hand closed
+  assert.equal(palmsOf([open(0.2), open(0.5), open(0.8)]), null);
+
+  const grab = { dist: 0.2, zoom: 1 };
+  assert.ok(Math.abs(palmGap([{ x: 0.3, y: 0.5 }, { x: 0.7, y: 0.5 }]) - 0.4) < 1e-9);
+  assert.equal(zoomTarget(grab, 0.4, 6), 2); // apart ×2 = zoom in ×2
+  assert.equal(zoomTarget(grab, 0.1, 6), 1); // together: never below 1×
+  assert.equal(zoomTarget(grab, 2, 6), 6); // capped at max
+  assert.equal(zoomTarget({ dist: 0.5, zoom: 3 }, 0.25, 6), 1.5); // grabbed at 3×, half the gap = zoom out
+});
+
 test("glide slows down and stops within ~2s", () => {
   let v = { x: 0, y: 100 };
   let frames = 0;

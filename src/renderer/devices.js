@@ -52,4 +52,5 @@ function initDevices() {
   window.addEventListener("focus", refresh);
   document.addEventListener("langchange", show);
 }
-if (globalThis.document) initDevices();
+// Only the main window has the pickers; the HUD imports this file just for deviceConstraint.
+if (globalThis.document?.getElementById("mic")) initDevices();

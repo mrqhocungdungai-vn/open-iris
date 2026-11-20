@@ -38,3 +38,13 @@ test("deviceConstraint: plain (ideal) deviceId, nothing for the default", () => 
   assert.deepEqual(deviceConstraint({ id: "c1", label: "" }), { deviceId: "c1" });
   assert.deepEqual(deviceConstraint(null), {});
 });
+
+test("importing in a page without the pickers (the HUD) does not throw", async () => {
+  globalThis.document = { getElementById: () => null };
+  try {
+    const m = await import("./devices.js?hud");
+    assert.deepEqual(m.deviceConstraint({ id: "x", label: "" }), { deviceId: "x" });
+  } finally {
+    delete globalThis.document;
+  }
+});

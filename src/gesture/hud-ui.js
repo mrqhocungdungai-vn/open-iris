@@ -1,6 +1,6 @@
 // HUD buttons, transcript and gallery. Clicked with the hand mouse: the window is click-through
 // except while the cursor is over the dock or the gallery is open (see hud:interactive in hud.mjs).
-import { RING_SLOTS, ringFront, ringTo, ringTurn } from "./hand.js";
+import { RING_SLOTS, ringFront, ringTo, ringTurn, palmGap, zoomTarget } from "./hand.js";
 
 const $ =(id) => document.getElementById(id);
 // UI language = the main window's Ngôn ngữ select (config lang), read each time the HUD opens; it cannot change while the HUD is up.
@@ -239,9 +239,9 @@ function pan(dx, dy) {
 
 window.addEventListener("palms", ({ detail: palms }) => {
   if (overlay.hidden || !palms) return void (grab = null);
-  const dist = Math.hypot(palms[0].x - palms[1].x, palms[0].y - palms[1].y);
-  grab ??= { dist, zoom };
-  const target = Math.max(1, Math.min(ZOOM_MAX, (grab.zoom * dist) / grab.dist));
+  const gap = palmGap(palms);
+  grab ??= { dist: gap, zoom };
+  const target = zoomTarget(grab, gap, ZOOM_MAX);
   zoom += (target - zoom) * 0.3; // damp the hand jitter
   pan(0, 0); // re-clamp the pan to the new zoom
 });

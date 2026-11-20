@@ -68,6 +68,13 @@ export function glide(v, decay = 0.92) {
 export const isOpen = (lm) =>
   [[8, 6], [12, 10], [16, 14], [20, 18]].every(([tip, pip]) => extended(lm, tip, pip)) && pinchRatio(lm, 8) > PINCH_OFF && pinchRatio(lm, 12) > PINCH_OFF;
 
+// Two-hand zoom (HUD gallery viewer): both palms (middle knuckle 9, mirrored like the screen), or null unless exactly
+// two hands are seen and both are open ✋.
+export const palmsOf = (hands) => (hands.length === 2 && hands.every(isOpen) ? hands.map((l) => ({ x: 1 - l[9].x, y: l[9].y })) : null);
+// Zoom follows the palm gap: `grab` = { dist, zoom } when the two hands appeared. Hands twice as far apart = twice the zoom.
+export const palmGap = (palms) => dist(palms[0], palms[1]);
+export const zoomTarget = (grab, gap, max) => Math.max(1, Math.min(max, (grab.zoom * gap) / grab.dist));
+
 export const isFist = (lm) => [[8, 6], [12, 10], [16, 14], [20, 18]].every(([tip, pip]) => !extended(lm, tip, pip));
 
 // Rock 🤘 (index + pinky up, middle + ring folded), held LOCK_HOLD_MS, toggles control. Unusual on purpose: never by accident.
