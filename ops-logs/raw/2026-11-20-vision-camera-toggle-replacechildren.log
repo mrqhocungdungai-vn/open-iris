@@ -1,0 +1,32 @@
+2026-11-20T10:21:59.887Z [INFO] [vision] off
+2026-11-20T10:21:59.888Z [INFO] [control] off
+2026-11-20T10:21:59.912Z [INFO] [vision] on
+2026-11-20T10:21:59.912Z [INFO] [control] off
+2026-11-20T10:21:59.985Z [INFO] [vision] off
+2026-11-20T10:21:59.985Z [INFO] [control] off
+2026-11-20T10:22:00.011Z [INFO] [vision] on
+2026-11-20T10:22:00.012Z [INFO] [control] off
+2026-11-20T10:22:00.057Z [INFO] [vision] off
+2026-11-20T10:22:00.057Z [INFO] [control] off
+2026-11-20T10:22:00.081Z [INFO] [vision] on
+2026-11-20T10:22:00.081Z [INFO] [control] off
+2026-11-20T10:22:00.083Z [ERROR] [renderer] Uncaught (in promise) TypeError: Cannot read properties of null (reading 'replaceChildren')
+2026-11-20T10:22:00.143Z [INFO] [vision] off
+2026-11-20T10:22:00.143Z [INFO] [control] off
+2026-11-20T10:22:00.166Z [INFO] [vision] on
+2026-11-20T10:22:00.167Z [INFO] [control] off
+2026-11-20T10:22:00.169Z [ERROR] [renderer] Uncaught (in promise) TypeError: Cannot read properties of null (reading 'replaceChildren')
+2026-11-20T10:22:00.241Z [INFO] [vision] off
+2026-11-20T10:22:00.241Z [INFO] [control] off
+2026-11-20T10:22:00.261Z [INFO] [vision] on
+2026-11-20T10:22:00.261Z [INFO] [control] off
+2026-11-20T10:22:00.263Z [ERROR] [renderer] Uncaught (in promise) TypeError: Cannot read properties of null (reading 'replaceChildren')
+2026-11-20T10:22:00.308Z [INFO] [renderer] Graph successfully started running.
+2026-11-20T10:22:00.330Z [INFO] [vision] off
+2026-11-20T10:22:00.331Z [INFO] [control] off
+2026-11-20T10:22:00.360Z [INFO] [vision] on
+2026-11-20T10:22:00.360Z [INFO] [control] off
+2026-11-20T10:22:00.360Z [ERROR] [renderer] Uncaught (in promise) TypeError: Cannot read properties of null (reading 'replaceChildren')
+2026-11-20T10:22:00.401Z [INFO] [renderer] Graph successfully started running.
+2026-11-20T10:22:00.441Z [INFO] [vision] off
+2026-11-20T10:22:00.441Z [INFO] [control] off
