@@ -18,6 +18,7 @@ export const TEXT_MAX = 1000, FIELD_MAX = 1000, LABEL_MAX = 80, MATCHER_MAX = 20
 export const SESSION_CONTEXT_MAX = 4000; // all SessionStart context together; it sits in the system instruction for the whole session
 export const EVERY_MIN = 2, EVERY_MAX = 60;
 export const QUIET_MS = 4000, GAP_MS = 60_000;
+export const SESSION_START_MAX_MS = 15_000; // all SessionStart command hooks together: the session waits for them before it connects
 export const TIMEOUT_S = 3, TIMEOUT_MAX_S = 10, TICK_TIMEOUT_MAX_S = 30;
 export const OUT_MAX = 64 * 1024;
 export const COMPONENTS = ["hooks", "tools"];
@@ -588,7 +589,7 @@ export function createHooks({
     pending = pending.filter((x) => !x.late); // a queued late result (later()) belongs to the dropped conversation too
   };
 
-  async function runGroup(event, { p, g, cfg }, payload) {
+  async function runGroup(event, { p, g, cfg }, payload, deadline = Infinity) {
     const values = valuesOf(p, cfg);
     const out = { context: [], speak: [] };
     for (const hook of g.hooks) {
@@ -598,10 +599,12 @@ export function createHooks({
         continue;
       }
       let o;
+      const left = deadline - now();
       if (!trustedNow(p)) o = { failed: "plugin is not trusted" };
+      else if (left <= 0) o = { failed: `skipped, ${event} hooks used ${SESSION_START_MAX_MS / 1000} s` };
       else {
         const input = { event, plugin: p.name, hook: g.id, session_id: sessionId, settings: values, lang, ...payload };
-        o = commandOutcome(await run(hook.command, input, { cwd: p.dir, env: envOf(p), timeoutMs: hook.timeout * 1000 }));
+        o = commandOutcome(await run(hook.command, input, { cwd: p.dir, env: envOf(p), timeoutMs: Math.min(hook.timeout * 1000, left) }));
         // Command text is plugin data like tool output (spec §12.6): filtered, and it taints the session once sent.
         for (const k of ["block", "context", "speak", "failed"]) if (o[k]) o[k] = cleanOutput(o[k]);
         if (o.block || o.context || o.speak || o.failed) out.tainted = true;
@@ -670,8 +673,9 @@ export function createHooks({
       if (event === "SessionStart") sessionId = crypto.randomUUID();
       const context = [];
       let tainted = false;
+      const deadline = event === "SessionStart" ? now() + SESSION_START_MAX_MS : Infinity;
       for (const item of active(event, payload.tool?.name)) {
-        const r = await runGroup(event, item, payload);
+        const r = await runGroup(event, item, payload, deadline);
         context.push(...r.context);
         // Names and sizes only: the text itself may be private, and main.log excerpts go to ops-logs/.
         if (r.context.length) log(`hook ${item.g.id} context +${r.context.join(" ").length} chars on ${event}${payload.tool?.name ? ` ${payload.tool.name}` : ""}`);

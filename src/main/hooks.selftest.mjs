@@ -486,3 +486,25 @@ console.log("hooks selftest ok");
   assert.ok(!trustCheck({}, () => "x")(p)); // never trusted
   fs.rmSync(dir, { recursive: true, force: true });
 }
+
+// K7: all SessionStart command hooks share 15 s. A slow first plugin shortens the next one's timeout and skips the rest.
+{
+  let t = 0;
+  const timeouts = [];
+  const mk = (name) => {
+    const p = parsePlugin(name, { ...meta, name, fields: [] }, () => ({ hooks: { SessionStart: [{ name: "start", hooks: [{ type: "command", command: "x", timeout: 10 }] }] } }));
+    p.dir = home;
+    return p;
+  };
+  const ps = ["a", "b", "c"].map(mk);
+  const sh = createHooks({
+    plugins: ps, home, trust: { a: "h", b: "h", c: "h" }, hashOf: () => "h", now: () => t, send: () => true,
+    run: async (_c, _i, { timeoutMs }) => { timeouts.push(timeoutMs); t += timeoutMs; return { code: 0, stdout: JSON.stringify({ hookSpecificOutput: { additionalContext: "ok" } }), stderr: "" }; },
+    getConfig: () => Object.fromEntries(["a", "b", "c"].map((n) => [n, { on: true, fields: {}, groups: { start: { on: true } } }])),
+  });
+  const r = await sh.emit("SessionStart");
+  assert.deepEqual(timeouts, [10_000, 5_000], "b gets what is left of 15 s, c never runs");
+  assert.equal(r.context, "ok ok");
+  t = 0, timeouts.length = 0;
+  await sh.emit("UserTurn", { text: "hi" }); // other events keep each hook's own timeout
+}
