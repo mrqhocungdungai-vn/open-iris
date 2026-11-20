@@ -1,10 +1,12 @@
 // Keeps one Live session alive across dropped connections (docs/session-plan.md, S2). Knows nothing about Electron or hooks:
 // main gives it connect(handle) → session, and reports server updates and closes. Close codes come from the S0 spike.
 
-// 1007 = bad API key. Quota text is from the docs; S0 could not trigger it.
-const fatal = (c) => c?.code === 1007 || /exhausted|quota/i.test(c?.reason || "");
-// 1008 "BidiGenerateContent session not found" = invalid or expired handle: start a fresh session at once.
-const staleHandle = (c) => c?.code === 1008 && /session not found/i.test(c?.reason || "");
+// 1007 "API key not valid" = bad key. Quota text is from the docs; S0 could not trigger it.
+// Any other 1007 on a fresh connection (e.g. "Thinking level must be specified") is a setup error: retrying cannot help.
+const fatal = (c, handle) => (c?.code === 1007 && (/api key/i.test(c?.reason || "") || !handle)) || /exhausted|quota/i.test(c?.reason || "");
+// Start a fresh session at once when the handle is useless: 1008 "session not found" = invalid or expired handle;
+// 1011 "Deadline expired" = server's ~58 min session cap, after which resume fails with 1007 "invalid argument" (forum, 2026-10).
+const staleHandle = (c) => (c?.code === 1008 && /session not found/i.test(c?.reason || "")) || c?.code === 1007 /* with a handle: fatal() catches it without */ || (c?.code === 1011 && /deadline expired/i.test(c?.reason || ""));
 
 export function createResumer({ connect, onReconnect, onGiveUp, log = () => {}, setTimeout = globalThis.setTimeout, clearTimeout = globalThis.clearTimeout, maxAttempts = 5 }) {
   let gen = 0, live = false, handle = null, attempts = 0, timer = null;
@@ -22,7 +24,7 @@ export function createResumer({ connect, onReconnect, onGiveUp, log = () => {}, 
 
   function closed(c) {
     if (!live || timer) return;
-    if (fatal(c)) return giveUp(c);
+    if (fatal(c, handle)) return giveUp(c);
     if (staleHandle(c)) handle = null;
     if (++attempts > maxAttempts) return giveUp(c);
     if (attempts >= 3) handle = null; // the handle itself may be what fails

@@ -96,6 +96,34 @@ test("a stale handle (1008 session not found) is dropped at once", async () => {
   assert.deepEqual(calls, [null, null]);
 });
 
+test("the 58 min cap (1011 deadline expired) reconnects fresh, not with the handle", async () => {
+  const { r, calls, gaveUp, tick } = rig();
+  await r.start();
+  r.update({ newHandle: "h1", resumable: true });
+  r.closed({ code: 1011, reason: "Deadline expired before operation could complete." });
+  assert.equal(await tick(), 500);
+  assert.deepEqual(calls, [null, null]);
+  assert.equal(gaveUp.length, 0);
+});
+
+test("1007 invalid argument (rejected resume) is not a bad key: it drops the handle and retries", async () => {
+  const { r, calls, gaveUp, tick } = rig();
+  await r.start();
+  r.update({ newHandle: "h1", resumable: true });
+  r.closed({ code: 1007, reason: "Request contains an invalid argument." });
+  await tick();
+  assert.deepEqual(calls, [null, null]);
+  assert.equal(gaveUp.length, 0);
+});
+
+test("1007 on a fresh connection (setup error) is not retried", async () => {
+  const { r, timers, gaveUp } = rig();
+  await r.start();
+  r.closed({ code: 1007, reason: "Thinking level must be specified for this model." });
+  assert.equal(timers.length, 0);
+  assert.equal(gaveUp.length, 1);
+});
+
 test("1008 client inactivity is a normal drop: the handle is kept", async () => {
   const { r, calls, tick } = rig();
   await r.start();

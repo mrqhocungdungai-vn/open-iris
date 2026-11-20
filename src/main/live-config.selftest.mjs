@@ -25,3 +25,5 @@ assert.deepEqual(on.sessionResumption, {}, "keep on, no handle: ask for handles"
 assert.deepEqual(on.contextWindowCompression, { slidingWindow: {} }, "keep on: sliding window with server defaults");
 assert.deepEqual(liveSetup("vi", tools, "", { keep: true, handle: "h1" }).sessionResumption, { handle: "h1" }, "handle resumes");
 assert.ok(!("sessionResumption" in liveSetup("vi", tools, "", { handle: "h1" })), "a handle without keep is ignored");
+assert.deepEqual(liveSetup("vi", tools, "", { model: "models/gemini-3.8-live-extended-thinking" }).thinkingConfig, { thinkingLevel: "LOW" }, "extended-thinking needs a level");
+assert.ok(!("thinkingConfig" in liveSetup("vi", tools, "", { model: "models/gemini-3.8-live" })), "other models: no thinkingConfig");

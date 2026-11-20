@@ -35,7 +35,7 @@ Bản này là việc L0 nhắc ở `docs/plugin-pack-plan.md` mục 5 và `docs
 | Hết quota | Không tạo được trong spike. `resume.mjs` nhận theo chữ "exhausted"/"quota" trong lý do đóng, chưa kiểm chứng |
 | Tool call đang dở lúc đóng | Trong lúc có tool call không có handle `resumable` mới. Sau resume, model **không gọi lại** tool và nói như thể vẫn đang chờ kết quả. Sau khi nối lại phải gửi lượt trạng thái báo tool đó đã huỷ (mục 6) |
 | Kết nối im lặng | Không gửi audio thì sau **2 phút** server đóng `1008 "Session closed due to client inactivity."`, không có `goAway` trước. Cùng mã 1008 với handle sai nên `resume.mjs` phân biệt bằng lý do: lỗi này nối lại với handle như thường |
-| `goAway.timeLeft` thực tế | Đang chạy (`--goaway`, giữ một kết nối ~11 phút). Sẽ ghi vào đây |
+| `goAway.timeLeft` thực tế | 2026-11-20, `gemini-3.8-live`, có resumption và `slidingWindow`, gửi audio im lặng liên tục: giữ một kết nối **16 phút**, server không gửi `goAway` và không đóng. Tài liệu nói kết nối sống "khoảng 10 phút", nhưng thực tế dài hơn. Trên diễn đàn (2026-10) có báo cáo phiên bị đóng ở 58:00 với `1011 "Deadline expired…"`, `goAway timeLeft=50s` đến trước khoảng 50 giây. Spike 70 phút `live-58.mjs` đang kiểm tra lại |
 
 ## 3. myiris làm gì, và ta lấy gì
 

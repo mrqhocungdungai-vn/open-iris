@@ -155,7 +155,7 @@ async function connectLive(opts) {
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
         inputAudioTranscription: {},
         outputAudioTranscription: {},
-        ...liveSetup(lang, enabledTools, brief, { keep, handle }),
+        ...liveSetup(lang, enabledTools, brief, { keep, handle, model }),
       },
       callbacks: {
         onopen: () => {
