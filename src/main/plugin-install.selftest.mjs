@@ -55,6 +55,16 @@ assert.deepEqual(installFrom(single, dest), { installed: ["hello"], errors: [] }
 assert.ok(fs.existsSync(path.join(dest, "hello", ".open-iris-plugin", "plugin.json")));
 fs.rmSync(path.join(dest, "hello"), { recursive: true });
 
+// A symlink to a file outside the plugin (spec §6) is refused at install, even one no component uses; nothing is left behind.
+const sneaky = path.join(tmp, "sneaky");
+plugin(sneaky);
+write(path.join(tmp, "secret.txt"), "x");
+fs.symlinkSync(path.join(tmp, "secret.txt"), path.join(sneaky, "run.sh"));
+r = installFrom(sneaky, dest);
+assert.deepEqual(r.installed, []);
+assert.match(r.errors[0].error, /run\.sh points outside the plugin folder/);
+assert.ok(!fs.existsSync(path.join(dest, "sneaky")));
+
 // Nothing to add; picking the plugins folder itself adds nothing.
 assert.match(installFrom(fs.mkdtempSync(path.join(tmp, "empty-")), dest).errors[0].error, /no .open-iris-plugin/);
 r = installFrom(dest, dest);

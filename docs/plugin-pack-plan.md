@@ -66,7 +66,13 @@ Gallery View chưa mở cho plugin.
 
 1. Ba câu ở `docs/plugin-hooks-spec.md` mục 11: cách đánh phiên bản, phạm vi mã băm tin cậy, hook `command` ở `UserTurn`/`IrisTurn`.
 2. ~~Session nào code lõi?~~ Đã chốt một phần (2026-11-20): open-iris-plugins-dev làm C1–C3, chỉ trong `hooks.mjs`, selftest của nó và script test. C4–C6 giao cho open-iris-dev, làm sau khi xong orb.
-3. Tool ghép (`tools`) có cần chạy shell hay AppleScript không? Đề xuất **chưa**, vì hook `command` đã là đường duy nhất cho code lạ.
+3. ~~Tool ghép (`tools`) có cần chạy shell hay AppleScript không?~~ Đã chốt (2026-11-20, user): **có thêm tool loại `command`** bên cạnh tool ghép, cho plugin `orca` (`open-iris-plugins/docs/orca-plugin-plan.md` K1–K4). Dùng chung cổng tin cậy theo mã băm với hook `command`, mọi tool plugin mặc định tắt, iris-security quét trước khi merge.
+4. Đã chốt (2026-11-20, user), sau K1–K4:
+   - **Cờ tainted: có.** Sau khi output plugin tới Gemini, các tool desktop hành động (click, gõ, phím, chọn mục, mở app) trả `NEEDS_CONFIRMATION`, tới khi có lời nói hoặc chữ gõ thật của user. Làm bằng hook `PreToolCall` của lõi.
+   - **Kết quả `late`: giữ `WHEN_IDLE`** (Iris tự nói khoảng 50–67%), không dùng `INTERRUPT`.
+   - **Kết quả `late` không mất khi nối lại hay ↺:** gửi vào phiên mới thành một lượt text của client.
+   - **Cho chạy O3**, test thật với session Orca.
+5. Đã chốt (2026-11-20, user), sau lần quét bảo mật của tool plugin: sửa cả 5 lỗi (2 trung bình, 3 thấp, `ops-logs/security/2026-11-20/REPORT.md`). Khi cờ tainted bật, **giữ mọi tool của plugin**, không chỉ tool có `confirm`. Hộp thoại tin cậy hiện tên từng tool.
 
 ## Liên quan
 

@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
 import { pushLine } from "../gesture/talk.js";
-import { cleanTools, desktopTools } from "./desktop.mjs";
+import { TOOL_DEFAULTS, cleanTools, desktopTools } from "./desktop.mjs";
 import { keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput } from "./input.mjs";
@@ -20,7 +20,7 @@ import { ago, rms16, VOICE_RMS } from "./perf.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
-import { cleanPluginConfig, createHooks, loadPlugins, NAME, trustHash } from "./hooks.mjs";
+import { cleanPluginConfig, createHooks, createTaint, deliverLate, killCommands, loadPlugins, NAME, trustHash } from "./hooks.mjs";
 import { pluginEntry } from "./plugin-list.mjs";
 import { guidePage, permitted } from "./guard.mjs";
 import { closeHud, closePop, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
@@ -96,6 +96,9 @@ let userSaid = "", irisSaid = ""; // transcript of the current turn, for UserTur
 let resumer = null; // "Giữ phiên dài" (resume.mjs): reconnects a dropped connection as the same session
 let meter = { model: "", keep: true, last: null }; // context meter (context-meter.mjs) of this session; last is resent after a reconnect
 let held = []; // plugin context that came while the connection was down, sent after the reconnect
+let taint = createTaint(); // spec §12.6: plugin output reached Gemini → desktop actions and plugin tools wait for the user's words
+let startTainted = false; // a SessionStart command hook's text sits in the system instruction, so ↺ taints again
+let convo = 0; // bumped by ↺: a late result in flight then belongs to the dropped conversation
 const inFlight = new Map(); // tool call id → name, to tell the model which calls a dropped connection cut off
 // trust.json: { [plugin]: sha256 } approved in the Plugin tab. File trust boundary: only names and strings survive.
 const trustFile = path.join(home, "trust.json");
@@ -133,17 +136,16 @@ async function connectLive(opts) {
   // Plugins (hooks.mjs) are read here too: plugin folders and trust apply from the next Start; switches and fields at each event.
   const plugins = loadPlugins(home, (m) => log("WARN", "plugins", m));
   hooks?.stop();
+  taint = createTaint((m) => log("INFO", "tool", m)); // a new session starts untainted
   hooks = createHooks({
-    plugins, getConfig: () => readConfig().plugins, trust: readTrust(), home, lang,
+    plugins, getConfig: () => readConfig().plugins, trust: readTrust(), home, lang, core: { PreToolCall: [(p) => taint.check(p)] },
     send: (text) => {
       if (!session || listenOnly) return false; // kept, retried next second (createHooks)
       try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true }); } catch (e) { log("ERROR", "plugins", `speak: ${e?.message || e}`); return false; }
       return true;
     },
-    addContext: (text) => {
-      if (!session && resumer?.live) return void held.push(text); // shortcut: unbounded while down, fine for ~30s of retries; cap it if retries get longer
-      try { session?.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "plugins", `context: ${e?.message || e}`); }
-    },
+    addContext,
+    markTaint: () => taint.mark(),
     log: (m) => log("INFO", "plugins", m),
   });
   userSaid = irisSaid = "";
@@ -151,6 +153,9 @@ async function connectLive(opts) {
   inFlight.clear();
   meter = { model, keep, last: null };
   const start = await hooks.emit("SessionStart");
+  startTainted = !!start.tainted;
+  if (startTainted) taint.mark();
+  enabledTools = enabledTools.concat(hooks.tools()); // plugin command tools (spec §12): fixed for this session, like the desktop switches
   const brief = personaBrief(loadOwner(home), skills) + (start.context ? ` ${start.context}` : "");
   log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none"}`);
   chunksIn = 0;
@@ -168,7 +173,7 @@ async function connectLive(opts) {
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
         inputAudioTranscription: {},
         outputAudioTranscription: {},
-        ...liveSetup(lang, enabledTools, brief, { keep, handle, model }),
+        ...liveSetup(lang, enabledTools, brief, { keep, handle, model, off: Object.keys(TOOL_DEFAULTS).filter((n) => !tools[n]) }),
       },
       callbacks: {
         onopen: () => {
@@ -219,6 +224,12 @@ async function connectLive(opts) {
   if (looking) tellLooking(); // an image was already open before Iris started
 }
 
+// Silent context for the current connection; held while it is down and sent after the reconnect.
+function addContext(text) {
+  if (!session && resumer?.live) return void held.push(text); // shortcut: unbounded while down, fine for ~30s of retries; cap it if retries get longer
+  try { session?.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "plugins", `context: ${e?.message || e}`); }
+}
+
 function handleMessage(message) {
   resumer?.update(message.sessionResumptionUpdate);
   if (message.usageMetadata) send("live:context", (meter.last = contextMeter(message.usageMetadata, meter.model, meter.keep))); // once per turn (C0)
@@ -231,6 +242,7 @@ function handleMessage(message) {
   // shortcut: a cancelled call still runs to the end; its response is just not sent. Abort execFile if that matters.
   for (const id of message.toolCallCancellation?.ids || []) {
     cancelledCalls.add(id);
+    hooks?.cancel(id); // a plugin `late` tool: kill its process, no late result
     log("INFO", "tool", `cancelled id=${id}`);
   }
   const content = message.serverContent;
@@ -240,6 +252,7 @@ function handleMessage(message) {
     log("DEBUG", "transcript", `you: ${content.inputTranscription.text}`);
     send("live:log", `you: ${content.inputTranscription.text}`);
     userSaid += content.inputTranscription.text;
+    taint.clear(); // the user's own words
     lastHeardAt = Date.now();
   }
   if (content.outputTranscription?.text && !(listenOnly && !announcing)) irisSaid += content.outputTranscription.text; // dropped words were never heard
@@ -310,27 +323,43 @@ async function handleToolCalls(calls) {
     return;
   }
   for (const { id, name } of calls) inFlight.set(id, name);
-  const t0 = Date.now();
+  const t0 = Date.now(), fromPlugin = new Set();
   const functionResponses = await Promise.all(calls.map(async ({ id, name, args }) => {
     const tool = enabledTools.find((t) => t.name === name);
+    if (tool?.plugin) fromPlugin.add(id);
     const pre = (await h?.emit("PreToolCall", { tool: { name, args } })) ?? { block: false, context: "" };
+    if (pre.tainted) fromPlugin.add(id); // command hook text goes into this response
     if (pre.block) return { id, name, response: { error: pre.reason } }; // emit already logged who blocked it
     // Desktop calls queue up in call order (a click then a type must not race); skill calls run in parallel.
-    const r = !tool ? { ok: false, error: `tool not enabled: ${name}` } : tool.desktop ? await (desktopQueue = desktopQueue.then(() => runDesktop(tool, args))) : await tool.run(args);
+    const r = !tool ? { ok: false, error: `tool not enabled: ${name}` } : tool.desktop ? await (desktopQueue = desktopQueue.then(() => runDesktop(tool, args))) : await tool.run(args, { id, onLate: (result, { from, args: used }) => sendLate(s, h, id, name, used, from, result) });
     const out = r.ok ? { output: r.output } : { error: r.error };
     log("INFO", "perf", `V2 tool=${name} ms=${Date.now() - t0} ok=${r.ok}`); // includes waiting in desktopQueue
     log("INFO", "tool", `${name} ${JSON.stringify(args || {}).slice(0, 80)} -> ${r.ok ? "ok" : "error"} ${JSON.stringify(out).length}B`);
     if (!r.ok && tool?.desktop) log("WARN", "tool", `${name} ${JSON.stringify(r.error).slice(0, 2000)}`); // why a type or click failed, for the eval loop
     const post = (await h?.emit("PostToolCall", { tool: { name, args }, result: out })) ?? { context: "" };
+    if (post.tainted) fromPlugin.add(id);
     const context = [pre.context, post.context].filter(Boolean).join(" ");
-    return { id, name, response: context ? { ...out, context } : out };
+    return { id, name, response: context ? { ...out, context } : out, ...(r.late && { willContinue: true }) };
   }));
   for (const { id } of calls) inFlight.delete(id);
   // A cancelled call's response is never sent, nor any response for a session that has ended since.
   const live = functionResponses.filter((f) => !cancelledCalls.delete(f.id));
   if (s !== session || !live.length) return;
   log("INFO", "perf", `V2 batch=${calls.length} ms=${Date.now() - t0}`);
+  if (live.some((f) => fromPlugin.has(f.id))) taint.mark(); // output or error, blocked or not: conservative
   try { s.sendToolResponse({ functionResponses: live }); } catch (e) { log("ERROR", "tool", `sendToolResponse: ${e?.message || e}`); }
+}
+
+// The second result of a plugin `late` tool (spec §12.3). On the asking connection: a toolResponse. After a resume or
+// reconnect of the same conversation: a client text turn (spoken when quiet, silent in 👂). New session or ↺: dropped.
+function sendLate(s, h, id, name, args, from, result) {
+  const c = convo;
+  deliverLate({
+    id, name, args, from, result, current: () => h === hooks && c === convo, resumed: () => s !== session, listenOnly: () => listenOnly,
+    emit: (event, payload) => h.emit(event, payload), log: (m) => log("INFO", "tool", m),
+    send: (fr) => { taint.mark(); try { s.sendToolResponse({ functionResponses: [fr] }); } catch (e) { log("ERROR", "tool", `sendToolResponse late: ${e?.message || e}`); } },
+    sendText: (text, silent) => { if (silent) { taint.mark(); addContext(text); } else h.later(name, text, () => taint.mark()); },
+  }).catch((e) => log("ERROR", "tool", `${name} late: ${e?.message || e}`));
 }
 
 // The hand must not move the mouse while agent-desktop clicks or types (headed typing takes the keyboard and front app).
@@ -363,6 +392,10 @@ async function clearContext() {
   log("INFO", "live", "clear requested");
   perfConnect = { t: Date.now(), kind: "clear" };
   const old = session;
+  hooks?.killLate(); // their results belong to the conversation ↺ just dropped
+  convo++;
+  taint.clear();
+  if (startTainted) taint.mark();
   session = null; // old's onclose then sees it is not the current connection and does nothing
   inFlight.clear();
   held = [];
@@ -431,6 +464,7 @@ const dropAdding = () => {
   adding = null;
 };
 app.on("will-quit", dropAdding);
+app.on("will-quit", () => { hooks?.killLate(); killCommands(); }); // no plugin process outlives the app
 const scanned = (source) => ({ source, plugins: scanPlugins(adding.dir, path.join(home, "plugins")) });
 ipcMain.handle("plugins:scan-folder", async (e) => {
   const pick = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), { properties: ["openDirectory"] });
@@ -505,19 +539,23 @@ ipcMain.handle("plugins:remove", async (e, name) => {
   const saved = readConfig();
   const { [name]: _c, ...plugins } = saved.plugins;
   writeConfig({ ...saved, plugins });
+  hooks?.prune(); // its config is gone, so its late tool is killed
   log("INFO", "plugins", `removed ${name}`);
   return true;
 });
-// Tab Plugin: { name, on?, fields?, groups?: { [group]: { on?, every_min? } } } for one plugin, merged over what is saved; clean() checks every value.
+// Tab Plugin: { name, on?, fields?, groups?: { [group]: { on?, every_min? } }, tools?: { [tool]: { on? } } } for one plugin, merged over what is saved; clean() checks every value.
 ipcMain.handle("config:plugin", (_e, patch) => {
   const saved = readConfig();
   const name = typeof patch?.name === "string" ? patch.name : "";
   const cur = saved.plugins[name] || {};
   const groups = { ...cur.groups };
   for (const [g, v] of Object.entries(patch?.groups && typeof patch.groups === "object" ? patch.groups : {})) groups[g] = { ...groups[g], ...v };
-  const next = { ...cur, ...(patch?.on !== undefined && { on: patch.on }), fields: { ...cur.fields, ...patch?.fields }, groups };
+  const tools = { ...cur.tools };
+  for (const [t, v] of Object.entries(patch?.tools && typeof patch.tools === "object" ? patch.tools : {})) tools[t] = { ...tools[t], ...v };
+  const next = { ...cur, ...(patch?.on !== undefined && { on: patch.on }), fields: { ...cur.fields, ...patch?.fields }, groups, tools };
   writeConfig({ ...saved, plugins: { ...saved.plugins, [name]: next } });
-  log("INFO", "plugins", `settings ${name} ${JSON.stringify({ on: patch?.on, fields: Object.keys(patch?.fields || {}), groups: patch?.groups })}`);
+  hooks?.prune(); // a plugin or tool switched off: its late process stops now
+  log("INFO", "plugins", `settings ${name} ${JSON.stringify({ on: patch?.on, fields: Object.keys(patch?.fields || {}), groups: patch?.groups, tools: patch?.tools })}`);
 });
 ipcMain.handle("config:lang", (_e, lang) => writeConfig({ ...readConfig(), lang })); // UI + Gemini language; clean() drops unknown values
 ipcMain.handle("config:mic", (_e, mic) => {
@@ -552,6 +590,7 @@ ipcMain.handle("live:input", (_e, parts, label) => {
   const clean = cleanInput(parts);
   if (!session || !clean) return false;
   log("INFO", "input", `typed turn: ${clean.map((p) => p.inlineData?.mimeType || "text").join(", ")}`);
+  taint.clear(); // the user's own typed words
   try { session.sendClientContent({ turns: [{ role: "user", parts: clean }], turnComplete: true }); } catch (e) { log("ERROR", "input", e?.message || String(e)); return false; }
   lastVoiceAt = lastHeardAt = Date.now(); // V1 for a typed turn starts at the send
   send("live:log", `⌨ ${String(label || "").slice(0, 300)}`);

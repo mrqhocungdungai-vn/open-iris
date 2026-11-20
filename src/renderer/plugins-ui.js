@@ -43,7 +43,7 @@ function askTrust(p) {
   $("td-list").replaceChildren(
     ...p.trust.commands.map((c) =>
       h("li", {}, h("code", { textContent: c.command }), h("br"),
-        h("small", { textContent: `${eventLabel(lang(), c.event)} (${c.event}${c.matcher ? ` · ${c.matcher}` : ""}) · ${tr("nhận", "receives")}: ${c.receives}` }))),
+        h("small", { textContent: `${c.tool ? `Tool ${p.name}__${c.tool}` : `${eventLabel(lang(), c.event)} (${c.event}${c.matcher ? ` · ${c.matcher}` : ""})`} · ${tr("nhận", "receives")}: ${c.receives}` }))),
   );
   $("td-speech").hidden = !hearsSpeech(p.trust);
   d.showModal();

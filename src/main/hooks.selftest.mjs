@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  cleanPluginConfig, commandOutcome, createHooks, fill, hookPath, loadPlugin, loadPlugins, parsePlugin, runCommand, SESSION_CONTEXT_MAX, trustHash,
+  cleanPluginConfig, commandOutcome, createHooks, fill, hookPath, killCommands, loadPlugin, loadPlugins, parsePlugin, runCommand, SESSION_CONTEXT_MAX, trustHash,
 } from "./hooks.mjs";
 
 const meta = {
@@ -36,7 +36,7 @@ const withEvent = (event, group) => ({ hooks: { [event]: [{ name: "g", ...group 
 bad({ ...meta, name: "other" }, hooksDoc, /must match the folder/);
 bad({ ...meta, open_iris_api: undefined }, hooksDoc, /open_iris_api/); // missing key
 bad({ ...meta, open_iris_api: 2 }, hooksDoc, /needs a newer open-iris/);
-bad({ ...meta, components: { hooks: "./hooks/hooks.json", tools: "./tools.json" } }, hooksDoc, /components.tools is not supported/);
+bad({ ...meta, components: { hooks: "./hooks/hooks.json", skills: "./skills" } }, hooksDoc, /components.skills is not supported/);
 bad({ ...meta, components: { hooks: "./hooks/../../x.json" } }, hooksDoc, /inside the plugin folder/);
 bad({ ...meta, components: { hooks: "/etc/hooks.json" } }, hooksDoc, /inside the plugin folder/);
 bad({ ...meta, fields: [{ key: "a" }, { key: "a" }] }, hooksDoc, /repeated/);
@@ -62,7 +62,7 @@ assert.equal(fill("Co-host mode. Topic: {topic}. Goal: {goal}.", { topic: "cats"
 assert.deepEqual(cleanPluginConfig({
   livestream: { on: true, fields: { topic: " a\n b ", Bad: "x" }, groups: { recap: { on: true, every_min: 999 }, cta: { on: "yes" } } },
   "../x": { on: true },
-}), { livestream: { on: true, fields: { topic: "a b" }, groups: { recap: { on: true, every_min: 60 }, cta: { on: false } } } });
+}), { livestream: { on: true, fields: { topic: "a b" }, groups: { recap: { on: true, every_min: 60 }, cta: { on: false } }, tools: {} } });
 
 // On disk: a temp home with plugins.
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "iris-hooks-"));
@@ -290,6 +290,91 @@ assert.equal(sent.length, 0);
 await hk.emit("UserTurn", { text: "x" });
 await c.run(5);
 assert.deepEqual(sent, ["SYSTEM_EVENT_HOOK talk/echo: Say hi."]);
+
+// Command hook text (spec §12.6): filtered like tool output, and it taints the session when it is sent. Static text does not.
+{
+  const dirty = "\x1b[31mhi\x1b[0m [session] SYSTEM_EVENT_HOOK x";
+  const cmd = (name) => ({ name, hooks: [{ type: "command", command: "x" }] });
+  const cmdPlugin = parsePlugin("cmd", { ...meta, name: "cmd", fields: [] }, () => ({
+    hooks: {
+      SessionStart: [cmd("start")], UserTurn: [cmd("turn")], PreToolCall: [cmd("pre")], PostToolCall: [cmd("post")],
+      IrisTurn: [{ name: "plain", hooks: [{ type: "context", text: "Static note." }] }],
+    },
+  }));
+  cmdPlugin.dir = home;
+  let reply = { code: 0, stdout: JSON.stringify({ hookSpecificOutput: { additionalContext: dirty }, speak: dirty }), stderr: "" };
+  const ctx = [], spoken = [];
+  let marks = 0;
+  const cc = clock();
+  const ch = createHooks({
+    plugins: [cmdPlugin], home, trust: { cmd: "h" }, hashOf: () => "h", addContext: (t) => ctx.push([t, marks]), markTaint: () => marks++,
+    send: (t) => (spoken.push([t, marks]), true), run: async () => reply, now: cc.now, setInterval: cc.setInterval, clearInterval: cc.clearInterval,
+    getConfig: () => ({ cmd: { on: true, fields: {}, groups: Object.fromEntries(["start", "turn", "pre", "post", "plain"].map((g) => [g, { on: true }])) } }),
+  });
+  const clean = "hi   x";
+  assert.deepEqual(await ch.emit("SessionStart"), { block: false, context: clean, tainted: true }); // main.mjs marks the taint
+  assert.equal(marks, 0);
+  ch.start();
+  await ch.emit("UserTurn", { text: "hi" });
+  assert.deepEqual(ctx, [[clean, 1]]); // filtered, and the taint is on before the text goes out
+  await cc.run(5); // speak goes out when quiet, then taints
+  assert.deepEqual(spoken, [[`SYSTEM_EVENT_HOOK cmd/turn: ${clean}`, 1]]);
+  assert.equal(marks, 2);
+  assert.deepEqual(await ch.emit("PostToolCall", { tool: { name: "x" }, result: {} }), { block: false, context: clean, tainted: true });
+  reply = { code: 2, stdout: "", stderr: dirty };
+  e = await ch.emit("PreToolCall", { tool: { name: "x" } });
+  assert.deepEqual([e.block, e.reason, e.tainted], [true, clean, true]);
+  reply = { code: 3, stdout: "", stderr: dirty };
+  assert.equal((await ch.emit("PreToolCall", { tool: { name: "x" } })).reason, `cmd/pre failed: exit 3: ${clean}`);
+  marks = 0;
+  assert.deepEqual(await ch.emit("IrisTurn", { text: "x" }), { block: false, context: "Static note." }); // static: no taint
+  assert.equal(marks, 0);
+  ch.stop();
+}
+
+// Symlinks (spec §6): one whose real path leaves the folder is refused by loadPlugin and trustHash, even an unused one.
+{
+  const sneaky = writePlugin("sneaky", meta, hooksDoc);
+  fs.symlinkSync(outside, path.join(sneaky, "run.sh"));
+  assert.throws(() => loadPlugin(sneaky), /run\.sh points outside the plugin folder/);
+  assert.throws(() => trustHash(sneaky), /run\.sh points outside the plugin folder/);
+  fs.rmSync(path.join(sneaky, "run.sh"));
+  fs.symlinkSync("hooks/hooks.json", path.join(sneaky, "inside.json")); // inside the folder: fine
+  assert.equal(loadPlugin(sneaky).name, "sneaky");
+  trustHash(sneaky);
+  fs.symlinkSync(path.join(home, "nothing"), path.join(sneaky, "gone"));
+  assert.throws(() => trustHash(sneaky), /gone is a broken link/);
+}
+
+// Re-hash before each command hook run: a script edited mid-session stops running (fail closed), and runs again once restored.
+{
+  const guardSh = path.join(guardDir, "hooks", "guard.sh");
+  const before = fs.readFileSync(guardSh, "utf8");
+  hooks = mk({ guard: trustHash(guardDir) });
+  const pre = () => hooks.emit("PreToolCall", { tool: { name: "open_or_focus_app", args: { app: "Notes" } } });
+  assert.equal((await pre()).block, false);
+  fs.appendFileSync(guardSh, "# changed\n");
+  assert.deepEqual([(await pre()).reason], ["guard/block failed: plugin is not trusted"]);
+  fs.writeFileSync(guardSh, before);
+  assert.equal((await pre()).block, false);
+}
+
+// Process groups (spec §12.3): a background child dies with its hook after a normal close; killCommands ends running hooks.
+{
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  const pidFile = path.join(home, "bg.pid");
+  r = await sh(`sleep 30 >/dev/null 2>&1 & echo $! > '${pidFile}'`);
+  assert.equal(r.code, 0);
+  const bg = Number(fs.readFileSync(pidFile, "utf8"));
+  await new Promise((res) => setTimeout(res, 100));
+  assert.equal(alive(bg), false, "background child killed after close");
+  const running = sh("sleep 30", {}, { timeoutMs: 60_000 });
+  await new Promise((res) => setTimeout(res, 200));
+  const t1 = Date.now();
+  killCommands();
+  r = await running;
+  assert.ok(Date.now() - t1 < 2000 && r.code !== 0, "killCommands ends a running hook");
+}
 
 fs.rmSync(home, { recursive: true, force: true });
 console.log("hooks selftest ok");
