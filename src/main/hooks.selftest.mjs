@@ -186,7 +186,7 @@ assert.equal((await hooks.emit("SessionStart")).context, ""); // whole plugin of
   const text = (await h.emit("SessionStart")).context;
   assert.ok(text.length <= SESSION_CONTEXT_MAX && text.length > 3000, `capped length ${text.length}`);
   assert.ok(text.startsWith("10") && text.includes(" 12") && !text.includes(" 13"), "first plugin's pieces kept in order");
-  assert.ok(capLogs.some((l) => /dropped 12 of 15/.test(l)), capLogs.join("|"));
+  assert.ok(capLogs.some((l) => / context=3002\/4000 dropped=12$/.test(l)), capLogs.join("|"));
 }
 
 // A plugin block comes before core; context from UserTurn goes to addContext.
@@ -374,6 +374,69 @@ assert.deepEqual(sent, ["SYSTEM_EVENT_HOOK talk/echo: Say hi."]);
   killCommands();
   r = await running;
   assert.ok(Date.now() - t1 < 2000 && r.code !== 0, "killCommands ends a running hook");
+}
+
+// Switched off mid-session (docs/plugin-off-and-log-plan.md §1): a queued speak, a tool call and a queued late result stop at once.
+{
+  const offMeta = { ...meta, name: "sw", fields: [], components: { hooks: "./hooks/hooks.json", tools: "./tools.json" } };
+  const sw = parsePlugin("sw", offMeta, () => ({
+    hooks: { UserTurn: [{ name: "echo", hooks: [{ type: "speak", text: "Say hi." }] }] },
+    tools: [{ name: "job", description: "Job.", command: "sh ./job.sh", parameters: { type: "object", properties: {} } }],
+  }));
+  const swCfg = { sw: { on: true, fields: {}, groups: { echo: { on: true } }, tools: { job: { on: true } } } };
+  const swLogs = [], swSent = [];
+  let spawned = 0;
+  const sc = clock();
+  const sh = createHooks({
+    plugins: [sw], home, getConfig: () => swCfg, trust: { sw: "h" }, hashOf: () => "h", log: (l) => swLogs.push(l),
+    run: async () => { spawned++; return { code: 0, stdout: JSON.stringify({ ok: true, output: "ok" }), stderr: "" }; },
+    send: (t) => swSent.push(t), now: sc.now, setInterval: sc.setInterval, clearInterval: sc.clearInterval,
+  });
+  await sh.emit("SessionStart");
+  sh.start();
+  const job = sh.tools().find((t) => t.name === "sw__job");
+  // A: a queued speak of a group switched off before it is sent is dropped.
+  await sh.emit("UserTurn", { text: "x" });
+  swCfg.sw.groups.echo.on = false;
+  await sc.run(10);
+  assert.deepEqual(swSent, [], "A: speak of a switched-off group is not sent");
+  assert.ok(swLogs.includes("hook sw/echo: switched off, speak dropped"));
+  // C: a queued late result of a tool switched off before it is sent is dropped.
+  sh.later("sw__job", "late text");
+  swCfg.sw.tools.job.on = false;
+  await sc.run(10);
+  assert.deepEqual(swSent, [], "C: late result of a switched-off tool is not sent");
+  // B: Gemini calls a switched-off tool: nothing runs.
+  assert.deepEqual(await job.run({}, {}), { ok: false, error: "tool switched off by the user" });
+  assert.equal(spawned, 0, "B: a switched-off tool does not spawn");
+  swCfg.sw.tools.job.on = true;
+  assert.equal((await job.run({}, {})).ok, true);
+  assert.equal(spawned, 1);
+  sh.stop();
+}
+
+// main.log says what each plugin adds, by name and size only, never the hook text (docs/plugin-off-and-log-plan.md §2).
+{
+  const lgMeta = { ...meta, name: "lg", fields: [], components: { hooks: "./hooks/hooks.json", tools: "./tools.json" } };
+  const lg = parsePlugin("lg", lgMeta, () => ({
+    hooks: {
+      SessionStart: [{ name: "brief", hooks: [{ type: "context", text: "SECRET_TEXT brief" }] }],
+      PreToolCall: [{ name: "guard", hooks: [{ type: "context", text: "SECRET_TEXT guard" }] }],
+      Tick: [{ name: "recap", every_min: 10, hooks: [{ type: "speak", text: "SECRET_TEXT recap" }] }],
+    },
+    tools: [{ name: "job", description: "Job.", brief: "SECRET_TEXT tool", command: "sh ./job.sh", parameters: { type: "object", properties: {} } }],
+  }));
+  const lgCfg = { lg: { on: true, fields: {}, groups: { brief: { on: true }, guard: { on: true }, recap: { on: true, every_min: 5 } }, tools: { job: { on: true } } } };
+  const lgLogs = [];
+  const lh = createHooks({ plugins: [lg], home, getConfig: () => lgCfg, trust: { lg: "h" }, hashOf: () => "h", log: (l) => lgLogs.push(l), send: () => true });
+  const st = await lh.emit("SessionStart");
+  await lh.emit("PreToolCall", { tool: { name: "click_app_control", args: {} } });
+  assert.deepEqual(lgLogs, [
+    "hook lg/brief context +17 chars on SessionStart",
+    `session groups=lg/brief@SessionStart,lg/guard@PreToolCall,lg/recap@Tick/5m tools=lg__job context=${st.context.length}/${SESSION_CONTEXT_MAX} dropped=0`,
+    "hook lg/guard context +17 chars on PreToolCall click_app_control",
+  ]);
+  assert.ok(lgLogs.every((l) => !l.includes("SECRET_TEXT")), "no hook text in main.log");
 }
 
 fs.rmSync(home, { recursive: true, force: true });

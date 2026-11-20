@@ -508,6 +508,8 @@ export function createHooks({
       .filter((g) => !g.matcher || !tool || new RegExp(g.matcher).test(tool))
       .map((g) => ({ p, g, cfg: config[p.name] })));
   };
+  // A switch read now, not at the event: switching off mid-session stops a queued speak or a tool call at once. kind: groups | tools.
+  const isOn = (plugin, kind, name) => { const c = getConfig()[plugin]; return !!(c?.on && c[kind]?.[name]?.on); };
 
   let sessionId = null;
   const envOf = (p) => {
@@ -517,12 +519,13 @@ export function createHooks({
   };
 
   // --- command tools (spec §12) ---
-  let sessionTools = [];
+  let sessionTools = [], sessionOff = [];
   const running = new Map(); // tool id → { callId, kill, plugin, tool }: the one live `late` process per tool
   const wrap = (p, o) => wrapOutput(p.name, o);
   // Re-hashed at every spawn (not the per-session cache): a folder edited mid-session fails closed.
   const trustedNow = (p) => { try { return typeof trust[p.name] === "string" && hashOf(p.dir) === trust[p.name]; } catch { return false; } };
   async function runTool(p, t, raw, { id, onLate = () => {} }) {
+    if (!isOn(p.name, "tools", t.name)) { log(`tool ${t.id}: not run, switched off`); return { ok: false, error: "tool switched off by the user" }; }
     if (t.confirm && raw.confirmed !== true) {
       return { ok: false, error: { code: "NEEDS_CONFIRMATION", message: `${t.id} needs the user's yes. Ask the user to confirm out loud, then call again with confirmed true.` } };
     }
@@ -547,9 +550,12 @@ export function createHooks({
     return first.ok ? { ...first, late: true } : first;
   }
   // Enabled + trusted tools as registry entries: { name, description, parameters, nonBlocking?, brief, run(args, {id, onLate}) }.
+  const usable = (config) => plugins.filter((p) => !p.error && p.tools?.length && config[p.name]?.on && isTrusted(p));
+  // Tools of an on, trusted plugin whose own switch is off: Iris may say "that is off". Untrusted or off plugins stay unnamed.
+  const offList = () => { const config = getConfig(); return usable(config).flatMap((p) => p.tools.filter((t) => !config[p.name].tools?.[t.name]?.on).map((t) => t.id)); };
   const toolList = () => {
     const config = getConfig();
-    return plugins.filter((p) => !p.error && p.tools?.length && config[p.name]?.on && isTrusted(p)).flatMap((p) => p.tools
+    return usable(config).flatMap((p) => p.tools
       .filter((t) => config[p.name].tools?.[t.name]?.on)
       .map((t) => ({
         name: t.id, description: t.description, brief: t.brief, plugin: p.name,
@@ -607,16 +613,18 @@ export function createHooks({
 
   // --- speaking and Tick (one 1-second loop while a session is live) ---
   let tick = null, ticks = [], pending = [], lastActivityAt = 0, lastSentAt = -Infinity;
-  const say = (id, text, late, tainted) => {
+  // owner: [plugin, kind, name], the switch that must still be on when the turn is sent.
+  const say = (id, text, late, tainted, owner) => {
     if (!tick) return log(`hook ${id}: speak dropped, no session`);
     pending = pending.filter((x) => x.id !== id);
-    pending.push(late ? { id, text, late } : { id, text: `SYSTEM_EVENT_HOOK ${id}: ${text}`, tainted });
+    pending.push(late ? { id, text, late, owner } : { id, text: `SYSTEM_EVENT_HOOK ${id}: ${text}`, tainted, owner });
   };
+  const groupOf = ({ p, g }) => [p.name, "groups", g.name];
   async function runTick(id) {
     const item = active("Tick").find((x) => x.g.id === id);
     if (!item) return;
     const r = await runGroup("Tick", item, {});
-    for (const s of r.speak) say(id, s, null, r.tainted);
+    for (const s of r.speak) say(id, s, null, r.tainted, groupOf(item));
   }
   function loop() {
     const t = now();
@@ -625,6 +633,8 @@ export function createHooks({
       runTick(k.id).catch((e) => log(`hook ${k.id}: ${e.message}`));
     }
     if (!pending.length || t - lastActivityAt < quietMs || t - lastSentAt < gapMs) return;
+    while (pending[0]?.owner && !isOn(...pending[0].owner)) { log(`hook ${pending[0].id}: switched off, speak dropped`); pending.shift(); }
+    if (!pending.length) return;
     if (send(pending[0].text) === false) return;
     pending[0].late?.(); // sent: e.g. taint the session
     if (pending[0].tainted) markTaint();
@@ -645,8 +655,10 @@ export function createHooks({
       for (const item of active(event, payload.tool?.name)) {
         const r = await runGroup(event, item, payload);
         context.push(...r.context);
+        // Names and sizes only: the text itself may be private, and main.log excerpts go to ops-logs/.
+        if (r.context.length) log(`hook ${item.g.id} context +${r.context.join(" ").length} chars on ${event}${payload.tool?.name ? ` ${payload.tool.name}` : ""}`);
         if (r.context.length && r.tainted) tainted = true;
-        for (const s of r.speak) say(item.g.id, s, null, r.tainted);
+        for (const s of r.speak) say(item.g.id, s, null, r.tainted, groupOf(item));
         if (r.block) {
           log(`hook ${item.g.id} blocked ${payload.tool?.name ?? event}: ${r.block}`);
           return { block: true, reason: r.block, by: item.g.id, context: context.join(" "), ...(r.tainted && { tainted: true }) };
@@ -658,11 +670,13 @@ export function createHooks({
       }
       if (event === "SessionStart") {
         sessionTools = toolList();
+        sessionOff = offList();
         context.push(...sessionTools.map((t) => t.brief).filter(Boolean)); // a tool's brief only while it is on (spec §12.1)
         // Keep whole pieces in plugin order; drop what no longer fits.
         let used = -1, kept = 0; // -1: the first piece has no joining space
         for (const c of context) { if (used + 1 + c.length > SESSION_CONTEXT_MAX) break; used += 1 + c.length; kept++; }
-        if (kept < context.length) log(`SessionStart context over ${SESSION_CONTEXT_MAX} chars: dropped ${context.length - kept} of ${context.length} pieces`);
+        const groups = EVENTS.flatMap((e) => active(e)).map(({ g, cfg }) => `${g.id}@${g.event}${g.event === "Tick" ? `/${cfg.groups[g.name].every_min ?? g.every_min}m` : ""}`);
+        log(`session groups=${groups.join(",")} tools=${sessionTools.map((t) => t.name).join(",")} context=${Math.max(0, used)}/${SESSION_CONTEXT_MAX} dropped=${context.length - kept}`);
         context.length = kept;
       }
       const text = context.join(" ");
@@ -688,9 +702,13 @@ export function createHooks({
     },
     // A late tool result for a renewed connection (deliverLate sendText): spoken like a speak hook, when quiet (WHEN_IDLE).
     // onSent() runs once it is really sent. killLate (↺) drops it.
-    later(id, text, onSent = () => {}) { say(id, text, onSent); },
+    later(id, text, onSent = () => {}) {
+      const t = sessionTools.find((x) => x.name === id);
+      say(id, text, onSent, false, t && [t.plugin, "tools", id.slice(t.plugin.length + 2)]);
+    },
     // The command tools of this session, fixed at SessionStart like the desktop tool switches.
     tools: () => sessionTools,
+    offTools: () => sessionOff,
     // toolCallCancellation: kill the late process of that call, if any.
     // ↺ clear, will-quit: kill every late process (no late result).
     killLate: killTools,
