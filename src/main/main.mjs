@@ -165,7 +165,8 @@ async function connectLive(opts) {
   enabledTools = enabledTools.concat(hooks.tools()); // plugin command tools (spec §12): fixed for this session, like the desktop switches
   const off = Object.keys(TOOL_DEFAULTS).filter((n) => !tools[n]).concat(hooks.offTools());
   if (abilities) enabledTools = enabledTools.concat(abilitiesTool(enabledTools, off));
-  const brief = personaBrief(loadPersona(home), skills, nameFor(saved.name, lang)) + (start.context ? ` ${start.context}` : "");
+  const brief = personaBrief(loadPersona(home), skills, nameFor(saved.name, lang));
+  const pluginEvents = hooks.speaks();
   livePlugins = plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none";
   deafTries = 0;
   log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${livePlugins}`);
@@ -185,7 +186,7 @@ async function connectLive(opts) {
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
         inputAudioTranscription: {},
         outputAudioTranscription: {},
-        ...liveSetup(lang, enabledTools, brief, { keep, handle, model, off }),
+        ...liveSetup(lang, enabledTools, brief, { keep, handle, model, off, plugin: start.context, events: pluginEvents }),
       },
       callbacks: {
         onopen: () => {

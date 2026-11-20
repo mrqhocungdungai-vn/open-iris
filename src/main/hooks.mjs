@@ -537,7 +537,7 @@ export function createHooks({
   };
 
   // --- command tools (spec §12) ---
-  let sessionTools = [], sessionOff = [];
+  let sessionTools = [], sessionOff = [], sessionSpeaks = false;
   const running = new Map(); // tool id → { callId, kill, plugin, tool }: the one live `late` process per tool
   const wrap = (p, o) => wrapOutput(p.name, o);
   // Checked at every spawn (not the per-session cache): a folder edited mid-session fails closed.
@@ -689,6 +689,8 @@ export function createHooks({
       if (event === "SessionStart") {
         sessionTools = toolList();
         sessionOff = offList();
+        // A group that can speak (speak, or a command whose output may speak) or a late tool: Iris gets SYSTEM_EVENT_HOOK turns.
+        sessionSpeaks = sessionTools.some((t) => t.nonBlocking) || [...SPEAK_EVENTS].flatMap((e) => active(e)).some(({ g }) => g.hooks.some((h) => h.type !== "context"));
         context.push(...sessionTools.map((t) => t.brief).filter(Boolean)); // a tool's brief only while it is on (spec §12.1)
         // Keep whole pieces in plugin order; drop what no longer fits.
         let used = -1, kept = 0; // -1: the first piece has no joining space
@@ -727,6 +729,7 @@ export function createHooks({
     // The command tools of this session, fixed at SessionStart like the desktop tool switches.
     tools: () => sessionTools,
     offTools: () => sessionOff,
+    speaks: () => sessionSpeaks,
     // toolCallCancellation: kill the late process of that call, if any.
     // ↺ clear, will-quit: kill every late process (no late result).
     killLate: killTools,

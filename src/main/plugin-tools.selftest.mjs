@@ -181,6 +181,7 @@ start = await h.emit("SessionStart");
 assert.match(start.context, /Kit runs jobs\./);
 const T = Object.fromEntries(h.tools().map((t) => [t.name.split("__")[1], t]));
 assert.equal(T.job.nonBlocking, true);
+assert.equal(h.speaks(), true, "a late tool on: the prompt explains SYSTEM_EVENT_HOOK (K1)");
 assert.equal(T.echo.plugin, "kit"); // main.mjs taints the session on a response of a plugin tool
 assert.equal(T.echo.nonBlocking, undefined);
 assert.equal(T.send.parameters.properties.confirmed.type, "boolean"); // confirm adds the core's confirmed flag

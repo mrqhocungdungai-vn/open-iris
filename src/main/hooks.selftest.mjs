@@ -170,6 +170,11 @@ const core = { PreToolCall: [(pl) => (order.push("core"), pl.tool.name === "rm" 
 hooks = createHooks({ plugins: [ls], getConfig: () => cfg, home, core, send: () => true });
 e = await hooks.emit("SessionStart");
 assert.deepEqual(e, { block: false, context: "Co-host mode. Topic: cats." }); // SessionStart context returned for the system instruction
+assert.equal(hooks.speaks(), false); // K1: context only, no SYSTEM_EVENT_HOOK sentence
+cfg = lsCfg({ brief: { on: true }, recap: { on: true } });
+await hooks.emit("SessionStart");
+assert.equal(hooks.speaks(), true); // a speak group on: the prompt explains the marker
+cfg = lsCfg({ brief: { on: true } });
 assert.deepEqual(await hooks.emit("PreToolCall", { tool: { name: "rm" } }), { block: true, reason: "core says no", by: "core", context: "" });
 cfg = lsCfg({ brief: { on: false } });
 assert.equal((await hooks.emit("SessionStart")).context, ""); // group switched off mid-run: config read at every event
@@ -392,6 +397,10 @@ assert.deepEqual(sent, ["SYSTEM_EVENT_HOOK talk/echo: Say hi."]);
     run: async () => { spawned++; return { code: 0, stdout: JSON.stringify({ ok: true, output: "ok" }), stderr: "" }; },
     send: (t) => swSent.push(t), now: sc.now, setInterval: sc.setInterval, clearInterval: sc.clearInterval,
   });
+  swCfg.sw.groups.echo.on = false;
+  await sh.emit("SessionStart");
+  assert.equal(sh.speaks(), false); // a tool without late does not speak
+  swCfg.sw.groups.echo.on = true;
   await sh.emit("SessionStart");
   sh.start();
   const job = sh.tools().find((t) => t.name === "sw__job");
