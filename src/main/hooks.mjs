@@ -270,6 +270,24 @@ export function trustHash(dir) {
   return h.digest("hex");
 }
 
+// → (plugin) → true if its folder still hashes to trust[name]. File bytes are re-read only when a file's path, ctime,
+// size, inode or mode changed since the last check (ctime cannot be set back by hand, unlike mtime), so a plugin with a
+// big node_modules does not re-read every file on each hook. A folder that cannot be walked falls back to hashOf.
+export function trustCheck(trust, hashOf = trustHash) {
+  const seen = new Map(); // plugin name → { sig, ok }
+  return (p) => {
+    try {
+      if (typeof trust[p.name] !== "string") return false;
+      let sig = "";
+      try { walkPlugin(p.dir, (r, _full, st) => { sig += `${r}\0${st.ctimeMs}\0${st.size}\0${st.ino}\0${st.mode}\n`; }); } catch { sig = null; }
+      if (sig !== null && seen.get(p.name)?.sig === sig) return seen.get(p.name).ok;
+      const ok = hashOf(p.dir) === trust[p.name];
+      if (sig !== null) seen.set(p.name, { sig, ok });
+      return ok;
+    } catch { return false; }
+  };
+}
+
 // shortcut: hooks get the app's PATH plus Homebrew's bin folders, because an app opened from Finder only has
 // /usr/bin:/bin:/usr/sbin:/sbin. Limit: node from nvm/asdf is still not found. Upgrade: a PATH setting in the Plugin tab.
 export const EXTRA_PATH = ["/opt/homebrew/bin", "/usr/local/bin"];
@@ -483,7 +501,7 @@ const valuesOf = (plugin, cfg) => Object.fromEntries(plugin.fields.map((f) => [f
 //   send(text)       speaks a turn; returns false when Iris may not speak now (listen-only, no session): the turn is kept
 //   addContext(text) silent context for UserTurn/IrisTurn/ListenOnlyChanged
 //   markTaint()      command hook text is about to reach Gemini through addContext or send (spec §12.6)
-//     shortcut: context sent while the connection is down is lost; hold it in main when S3 (docs/session-plan.md) wires reconnect.
+//                    while the connection is down, main holds it and sends it after the reconnect (main.mjs `held`)
 // Speaking (spec §4): only after quietMs of silence, gapMs apart, oldest first, one pending turn per group.
 export function createHooks({
   plugins, getConfig, trust = {}, home, lang = "vi", core = {}, send, addContext = () => {}, markTaint = () => {}, log = () => {},
@@ -522,8 +540,8 @@ export function createHooks({
   let sessionTools = [], sessionOff = [];
   const running = new Map(); // tool id → { callId, kill, plugin, tool }: the one live `late` process per tool
   const wrap = (p, o) => wrapOutput(p.name, o);
-  // Re-hashed at every spawn (not the per-session cache): a folder edited mid-session fails closed.
-  const trustedNow = (p) => { try { return typeof trust[p.name] === "string" && hashOf(p.dir) === trust[p.name]; } catch { return false; } };
+  // Checked at every spawn (not the per-session cache): a folder edited mid-session fails closed.
+  const trustedNow = trustCheck(trust, hashOf);
   async function runTool(p, t, raw, { id, onLate = () => {} }) {
     if (!isOn(p.name, "tools", t.name)) { log(`tool ${t.id}: not run, switched off`); return { ok: false, error: "tool switched off by the user" }; }
     if (t.confirm && raw.confirmed !== true) {

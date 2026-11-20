@@ -22,7 +22,7 @@ import { cleanName, cleanSkills, greeting, nameFor, loadPersona, loadSkills, per
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
 import { cleanPluginConfig, createHooks, createTaint, deliverLate, killCommands, loadPlugins, NAME, trustHash } from "./hooks.mjs";
 import { pluginEntry } from "./plugin-list.mjs";
-import { guidePage, permitted } from "./guard.mjs";
+import { guidePage, permitted, RUNNABLE } from "./guard.mjs";
 import { closeHud, closePop, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
 
 const execFileP = promisify(execFile);
@@ -110,6 +110,7 @@ function readTrust() {
 
 // A second live:start while one is still connecting is a no-op.
 let starting = false;
+let startGen = 0; // bumped by stopLive: a Start still in its SessionStart hooks gives up (window closed mid-start)
 async function startLive(opts) {
   if (session || starting || resumer?.live) return; // live = still connecting or reconnecting
   starting = true;
@@ -121,6 +122,7 @@ async function startLive(opts) {
 }
 
 async function connectLive(opts) {
+  const gen = startGen;
   perfConnect = { t: Date.now(), kind: "start" };
   lastVoiceAt = lastHeardAt = 0; // V1 of the greeting must not count from the last session's voice
   const { lang, model, voice, tools, skills: skillOn } = clean(opts);
@@ -155,6 +157,7 @@ async function connectLive(opts) {
   inFlight.clear();
   meter = { model, keep, last: null };
   const start = await hooks.emit("SessionStart");
+  if (gen !== startGen) return void endHooks(); // stopped while the hooks ran
   startTainted = !!start.tainted;
   if (startTainted) taint.mark();
   enabledTools = enabledTools.concat(hooks.tools()); // plugin command tools (spec §12): fixed for this session, like the desktop switches
@@ -378,6 +381,7 @@ async function runDesktop(tool, args) {
 }
 
 function stopLive() {
+  startGen++;
   if (session) log("INFO", "live", "stop requested");
   const s = session;
   session = null;
@@ -667,7 +671,7 @@ ipcMain.handle("gallery:item", async (_e, i) => {
   const st = fs.statSync(f, { throwIfNoEntry: false });
   if (st?.isDirectory()) return showFolder(f), "";
   // A stray double pinch must never run a program: scripts and executables are not opened.
-  if (/\.(command|sh|tool|terminal|workflow|scpt|applescript|jar|pkg|mpkg)$/i.test(f) || st?.mode & 0o111) return readConfig().lang === "en" ? "runnable file, not opened from the gallery" : "file chạy được, không mở từ gallery";
+  if (RUNNABLE.test(f) || st?.mode & 0o111) return readConfig().lang === "en" ? "runnable file, not opened from the gallery" : "file chạy được, không mở từ gallery";
   log("INFO", "gallery", `open with app ${f}`);
   return shell.openPath(f); // "" or macOS's error text
 });

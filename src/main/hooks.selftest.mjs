@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  cleanPluginConfig, commandOutcome, createHooks, fill, hookPath, killCommands, loadPlugin, loadPlugins, parsePlugin, runCommand, SESSION_CONTEXT_MAX, trustHash,
+  cleanPluginConfig, commandOutcome, createHooks, fill, hookPath, killCommands, loadPlugin, loadPlugins, parsePlugin, runCommand, SESSION_CONTEXT_MAX, trustCheck, trustHash,
 } from "./hooks.mjs";
 
 const meta = {
@@ -441,3 +441,22 @@ assert.deepEqual(sent, ["SYSTEM_EVENT_HOOK talk/echo: Say hi."]);
 
 fs.rmSync(home, { recursive: true, force: true });
 console.log("hooks selftest ok");
+
+// trustCheck re-reads file bytes only after a file changed
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "iris-trust-"));
+  fs.writeFileSync(path.join(dir, "a.sh"), "echo hi");
+  let hashes = 0;
+  const check = trustCheck({ t: trustHash(dir) }, (d) => (hashes++, trustHash(d)));
+  const p = { name: "t", dir };
+  assert.ok(check(p));
+  assert.ok(check(p));
+  assert.equal(hashes, 1); // unchanged folder: no second full hash
+  fs.writeFileSync(path.join(dir, "a.sh"), "echo evil");
+  assert.ok(!check(p)); // changed: hashed again and refused
+  assert.equal(hashes, 2);
+  fs.writeFileSync(path.join(dir, "b.sh"), "new file");
+  assert.ok(!check(p));
+  assert.ok(!trustCheck({}, () => "x")(p)); // never trusted
+  fs.rmSync(dir, { recursive: true, force: true });
+}

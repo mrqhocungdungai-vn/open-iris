@@ -21,3 +21,7 @@ export function guidePage(url, root) {
 // media: mic and camera. clipboard-read: the 📋 button in the chat window (compose-ui.js).
 const ALLOWED = new Set(["media", "clipboard-read"]);
 export const permitted = (permission, url, root) => ALLOWED.has(permission) && fileOf(url).startsWith(root + path.sep);
+
+// Files the gallery never opens: a stray double pinch must not run a program. .fileloc/.inetloc are Finder links that
+// open their target, which can be a script.
+export const RUNNABLE = /\.(command|sh|tool|terminal|workflow|scpt|applescript|jar|pkg|mpkg|fileloc|inetloc)$/i;
