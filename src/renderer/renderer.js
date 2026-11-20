@@ -50,6 +50,7 @@ let mic = null; // { stream, context }
 let out = null; // output AudioContext
 let playhead = 0;
 let sources = [];
+const meters = (window.irisMeters = { mic: null, out: null }); // orb-ui.js reads the voice levels
 
 async function startMic() {
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -62,7 +63,10 @@ async function startMic() {
   await context.audioWorklet.addModule("mic-downsample.js");
   const node = new AudioWorkletNode(context, "mic-downsample");
   node.port.onmessage = ({ data }) => window.iris.sendAudio(data);
-  context.createMediaStreamSource(stream).connect(node);
+  const source = context.createMediaStreamSource(stream);
+  source.connect(node);
+  meters.mic = context.createAnalyser();
+  source.connect(meters.mic);
   mic = { stream, context };
   console.info(`mic started device="${stream.getAudioTracks()[0]?.label}" sampleRate=${context.sampleRate}`);
 }
@@ -79,6 +83,7 @@ function stopMic() {
   mic?.stream.getTracks().forEach((t) => t.stop());
   mic?.context.close();
   mic = null;
+  meters.mic = null;
 }
 
 function play({ data, mimeType }) {
@@ -93,7 +98,8 @@ function play({ data, mimeType }) {
   for (let i = 0; i < n; i++) ch[i] = view.getInt16(i * 2, true) / 32768;
   const src = out.createBufferSource();
   src.buffer = buffer;
-  src.connect(out.destination);
+  if (!meters.out) (meters.out = out.createAnalyser()).connect(out.destination);
+  src.connect(meters.out);
   src.onended = () => (sources = sources.filter((s) => s !== src));
   // Queue chunks back-to-back so streamed audio plays gaplessly.
   const startAt = Math.max(out.currentTime + 0.03, playhead);
@@ -187,7 +193,6 @@ window.iris.onStatus((status) => {
     stopMic();
     $("toggle").textContent = tr("Bắt đầu", "Start");
     for (const id of ["lang", "model", "voice"]) $(id).disabled = false;
-    liveIds.forEach((id) => ($(id).disabled = false));
     toolBoxes().forEach((b) => (b.disabled = false));
     skillBoxes().forEach((b) => (b.disabled = false));
   }
@@ -222,7 +227,6 @@ $("toggle").onclick = async () => {
 async function start() {
   try {
     const opts = {};
-    for (const id of liveIds) $(id).disabled = true;
     for (const id of ["lang", "model", "voice"]) {
       $(id).disabled = true;
       opts[id] = $(id).value;

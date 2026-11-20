@@ -1,6 +1,7 @@
 // HUD buttons, transcript and gallery. Clicked with the hand mouse: the window is click-through
 // except while the cursor is over the dock or the gallery is open (see hud:interactive in hud.mjs).
 import { RING_SLOTS, ringFront, ringTo, ringTurn, palmGap, zoomTarget } from "./hand.js";
+import { mountOrb } from "../renderer/orb.js";
 
 const $ =(id) => document.getElementById(id);
 // UI language = the main window's Ngôn ngữ select (config lang), read each time the HUD opens; it cannot change while the HUD is up.
@@ -20,8 +21,15 @@ const interactive = () => {
   window.gesture.interactive(overDock || !$("gallery").hidden);
   window.gesture.hudGallery(!$("gallery").hidden); // the engine (main window) zooms with two hands only while it is open
 };
-$("dock").onmouseenter = () => ((overDock = true), interactive());
-$("dock").onmouseleave = () => ((overDock = false), interactive());
+for (const id of ["dock", "odock"]) {
+  $(id).onmouseenter = () => ((overDock = true), interactive());
+  $(id).onmouseleave = () => ((overDock = false), interactive());
+}
+
+// HUD orb: drawn here, driven by the main window (orb-ui.js), which owns the mic and the playback.
+const orb = mountOrb($("hud-orb"));
+window.iris.onOrb((input) => orb.set(input));
+window.iris.onOrbEnabled((on) => ($("hud-orb").hidden = !on));
 
 // Iris on/off, mic mute and listen-only. The main window runs Start/Stop with its own session/model/voice/tool picks.
 let live = "offline";
@@ -59,6 +67,7 @@ $("b-talk").onclick = () => {
   talk.classList.toggle("big");
   talk.scrollTop = talk.scrollHeight;
 };
+talk.onclick = () => talk.classList.contains("big") || $("b-talk").onclick(); // the one line opens it; 💬 closes it
 // Gemini speaks in chunks, one log line each; glue a chunk onto the row of the same speaker so a reply reads as one sentence.
 window.iris.onLog((line) => {
   const who = /^(you|iris):/.exec(line)?.[0];
@@ -70,7 +79,11 @@ window.iris.onLog((line) => {
   }
   const row = document.createElement("div");
   row.className = who === "you:" ? "you" : who === "iris:" ? "iris" : "sys";
-  if (who) row.dataset.who = who;
+  if (who) {
+    row.dataset.who = who;
+    talk.querySelector(".now")?.classList.remove("now");
+    row.classList.add("now"); // the one line shown while the conversation is small
+  }
   row.textContent = line;
   talk.append(row);
   while (talk.childElementCount > 200) talk.firstChild.remove();
@@ -97,7 +110,7 @@ $("b-gallery").onclick = () =>
 window.iris.onGalleryEnabled((on) => ($("b-gallery").hidden = !on)); // only while Features › Gallery View is on
 window.iris.onGallery((g) => (g ? show(g) : overlay.hidden || close()));
 window.gesture.onHud((on) => {
-  $("dock").hidden = !on;
+  $("dock").hidden = $("odock").hidden = !on;
   if (on) window.iris.getConfig().then((c) => setLang(c.lang));
 });
 document.addEventListener("langchange", showButtons);

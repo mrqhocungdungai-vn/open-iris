@@ -6,7 +6,9 @@ import { DESKTOP_BRIEF } from "./desktop.mjs";
 export const keyFormatOk = (key) => /^[\w.-]{20,200}$/.test(key);
 
 // brief: owner notes and the skill list (persona.mjs), appended last so they never reframe the rules.
-export function liveSetup(lang, enabledTools, brief = "") {
+// keep ("Giữ phiên dài", docs/session-plan.md): resumption handles plus a sliding window, so a session outlives the
+// ~10-min connection and the 15-min audio limit. handle: the last resumable one, to continue that session.
+export function liveSetup(lang, enabledTools, brief = "", { keep = false, handle = null } = {}) {
   const desk = enabledTools.some((t) => t.desktop);
   const text = `You are Iris, a concise, friendly voice assistant. Always speak ${lang === "en" ? "English" : "Vietnamese"}, even if the user speaks another language.`
     + " You explain things like a knowledgeable friend. Your tools are your own abilities: never mention agents or handing work to someone else."
@@ -18,6 +20,8 @@ export function liveSetup(lang, enabledTools, brief = "") {
     + brief;
   return {
     systemInstruction: { parts: [{ text }] },
+    // slidingWindow {} = server defaults: trigger at 80% of the model's context, trim to half of that; the system instruction stays.
+    ...(keep && { sessionResumption: handle ? { handle } : {}, contextWindowCompression: { slidingWindow: {} } }),
     ...(enabledTools.length && {
     // shortcut: behavior is sent for every model; drop it if gemini-3.1-flash-live-preview rejects it.
       tools: [{ functionDeclarations: enabledTools.map(({ name, description, parameters, nonBlocking }) => ({ name, description, parameters, behavior: nonBlocking ? Behavior.NON_BLOCKING : Behavior.BLOCKING })) }],

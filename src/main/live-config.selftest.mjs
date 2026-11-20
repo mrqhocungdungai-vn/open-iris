@@ -15,3 +15,13 @@ assert.ok(!text.includes("coding_task"), "no coding_task");
 assert.ok(text.includes(" Never use the app tools to read a terminal window."), "terminal sentence");
 assert.ok(text.includes("A message starting with [gallery] is silent context"), "[gallery] sentence");
 assert.ok(!text.includes("Claude Code"), "no Claude Code");
+
+// Giữ phiên dài: off adds nothing; on asks for handles and compression; a handle resumes that session.
+const tools = desktopTools();
+const off = liveSetup("vi", tools);
+assert.ok(!("sessionResumption" in off) && !("contextWindowCompression" in off), "keep off: no resume keys");
+const on = liveSetup("vi", tools, "", { keep: true });
+assert.deepEqual(on.sessionResumption, {}, "keep on, no handle: ask for handles");
+assert.deepEqual(on.contextWindowCompression, { slidingWindow: {} }, "keep on: sliding window with server defaults");
+assert.deepEqual(liveSetup("vi", tools, "", { keep: true, handle: "h1" }).sessionResumption, { handle: "h1" }, "handle resumes");
+assert.ok(!("sessionResumption" in liveSetup("vi", tools, "", { handle: "h1" })), "a handle without keep is ignored");

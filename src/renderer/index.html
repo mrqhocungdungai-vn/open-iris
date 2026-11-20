@@ -12,6 +12,7 @@
     <input type="radio" name="tab" id="t-talk" checked /><label for="t-talk" data-en="Conversation">Hội thoại</label>
     <input type="radio" name="tab" id="t-set" /><label for="t-set" data-en="Settings">Thiết lập</label>
     <input type="radio" name="tab" id="t-feat" /><label for="t-feat" data-en="Features">Tính năng</label>
+    <input type="radio" name="tab" id="t-plug" /><label for="t-plug" lang="en">Plugin</label>
   </fieldset>
 </header>
 <main>
@@ -50,6 +51,8 @@
   <h2 lang="en">Gallery View</h2>
   <label class="feature"><input id="gallery-on" type="checkbox" role="switch" checked /> <span><span data-en="Browse folders and images by hand">Xem thư mục, ảnh bằng tay</span> <small data-en="open it with the Gallery button below; dropping a folder or image on the window opens it too">mở bằng nút Gallery ở dưới; kéo thư mục hoặc ảnh vào cửa sổ cũng mở</small></span></label>
   <p class="more"><a id="gallery-guide-link" href="../gesture/gallery-guide.html" target="_blank" data-en="Gallery View guide">Hướng dẫn Gallery View</a></p>
+  <h2 lang="en">Orb</h2>
+  <label class="feature"><input id="orb-on" type="checkbox" role="switch" checked /> <span><span data-en="Show the orb that reacts to the voices">Hiện quả cầu phản ứng theo giọng nói</span> <small data-en="bottom-left of the window and of the HUD">góc dưới trái cửa sổ và HUD</small></span></label>
   <!-- macOS permissions for the whole app: Hand Task Vision (Accessibility, Camera) and voice (Microphone). -->
   <h2 data-en="macOS permissions">Quyền macOS</h2>
   <fieldset id="perms">
@@ -58,7 +61,24 @@
   </fieldset>
   <p id="perm-hint" hidden></p>
 </section>
-<!-- Hand Task Vision camera: picture-in-picture in the bottom-right corner on every tab while vision is on. -->
+<!-- Plugin tab (plugins-ui.js): cards from main's plugins:list, hooks only. -->
+<section id="p-plug" class="scroll">
+  <h2 lang="en">Plugins</h2>
+  <p class="more"><small data-en="~/.open-iris/plugins/&lt;name&gt;/. New plugins start off. On/off and periods take effect at the next Start; text fields apply at once.">~/.open-iris/plugins/&lt;tên&gt;/. Plugin mới cài đều tắt. Bật/tắt và chu kỳ có hiệu lực từ lần Bắt đầu kế tiếp; các ô nhập dùng ngay.</small></p>
+  <p id="plug-error" role="alert" hidden></p>
+  <div id="plugins"></div>
+  <div class="perm-actions"><button id="plugins-add" data-en="Add a plugin from a folder…">Thêm plugin từ thư mục…</button> <button id="plugins-open" data-en="Open the plugins folder">Mở thư mục plugin</button></div>
+  <form id="plug-url" class="perm-actions"><input id="plug-url-in" type="url" required placeholder="https://github.com/<chủ>/<repo>/tree/main/plugins/<tên>" data-en-placeholder="https://github.com/<owner>/<repo>/tree/main/plugins/<name>" aria-label="Link GitHub của plugin" data-en-aria-label="GitHub link of the plugin"> <button data-en="Get from GitHub">Cài từ GitHub</button></form>
+  <p id="plug-added" role="status" hidden></p>
+  <div id="plug-pick" hidden></div>
+  <p class="more"><small data-en="Pick a folder (one plugin or a whole repo), or paste a GitHub link to a repo or to one plugin folder (…/tree/&lt;branch&gt;/plugins/&lt;name&gt;). Iris lists the plugins it finds; tick the ones to copy into ~/.open-iris/plugins/. New plugins start off. To update: add the same folder or link again (trust it again).">Chọn một thư mục (một plugin hoặc cả repo), hoặc dán link GitHub của repo hay của một thư mục plugin (…/tree/&lt;nhánh&gt;/plugins/&lt;tên&gt;). Iris liệt kê các plugin tìm thấy; tick plugin muốn chép vào ~/.open-iris/plugins/. Plugin mới cài đều tắt. Cập nhật: thêm lại thư mục hoặc link đó (phải tin cậy lại).</small></p>
+</section>
+</main>
+<p id="error" role="alert" hidden></p>
+<!-- Bottom strip on every tab: orb left, the run buttons in the middle, Hand Task Vision camera right. A row of its own, so it never covers a tab. -->
+<div id="corner">
+<div id="run"><button id="toggle">Bắt đầu</button> <button id="mute" disabled>🎤 Mic</button> <button id="listen" disabled aria-pressed="false" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂 Chỉ nghe</button> <button id="gallery-open" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼 Gallery</button><span id="status" role="status" data-state="offline">Chưa chạy</span> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label> <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" title="Hướng dẫn HUD: các nút, phím tắt" data-en-title="HUD guide: buttons, shortcuts" aria-label="Hướng dẫn HUD" data-en-aria-label="HUD guide">?</a></div>
+<!-- Hand Task Vision camera: right end of the strip while vision is on. -->
 <div id="hv-view" class="camera-frame" hidden>
   <video id="hv-cam" autoplay muted playsinline></video>
   <canvas id="hv-bones" width="640" height="480"></canvas>
@@ -66,9 +86,19 @@
   <span id="hv-pose" role="status"></span>
   <button id="hv-hide" aria-pressed="false" title="Thu gọn camera thành 1 dòng / mở lại" data-en-title="Collapse the camera to one line / expand it">▾</button>
 </div>
-</main>
-<p id="error" role="alert" hidden></p>
-<footer id="run"><button id="toggle">Bắt đầu</button> <button id="mute" disabled>🎤 Mic</button> <button id="listen" disabled aria-pressed="false" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂 Chỉ nghe</button> <button id="gallery-open" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼 Gallery</button><span id="status" role="status" data-state="offline">Chưa chạy</span> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label> <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" title="Hướng dẫn HUD: các nút, phím tắt" data-en-title="HUD guide: buttons, shortcuts" aria-label="Hướng dẫn HUD" data-en-aria-label="HUD guide">?</a></footer>
+<div id="orb"><canvas id="orb-canvas" width="280" height="280" role="img" aria-label="Orb Iris"></canvas></div>
+</div>
+<!-- Plugin trust gate (spec §6): shown before a command first runs, and again after any file in the plugin changes. -->
+<dialog id="trust-dlg" aria-labelledby="td-title">
+  <form method="dialog">
+    <h3 id="td-title"><span data-en="Trust this plugin?">Tin cậy plugin này?</span> <b id="td-name" lang="en"></b></h3>
+    <p data-en="It will run these commands on your Mac:">Plugin sẽ chạy các lệnh sau trên máy bạn:</p>
+    <ul id="td-list"></ul>
+    <p id="td-speech" class="warn" hidden data-en="This plugin gets your and Iris's exact words every turn. Its commands can save them or send them elsewhere.">Plugin nhận nguyên văn lời bạn và Iris nói trong mỗi lượt. Lệnh có thể lưu hoặc gửi nội dung đó đi nơi khác.</p>
+    <p class="warn" data-en="Commands run with your permissions and are not sandboxed: they can read and change your files. Only trust plugins whose source you know. If any file in the plugin changes, Iris asks again.">Lệnh chạy với quyền của bạn và không bị sandbox: chúng đọc, ghi được file của bạn. Chỉ tin cậy plugin bạn biết rõ nguồn. Plugin đổi bất kỳ file nào thì Iris sẽ hỏi lại.</p>
+    <menu><button value="cancel" data-en="Cancel">Huỷ</button> <button value="ok" data-en="Trust and turn on">Tin cậy và bật</button></menu>
+  </form>
+</dialog>
 <!-- Welcome / setup check (welcome.js): first launch, or Thiết lập → Kiểm tra cài đặt. Missing pieces only lock their feature. -->
 <dialog id="welcome" aria-labelledby="w-title">
   <div class="w-dots"><i></i><i></i><i></i><i></i><i></i></div>
@@ -107,3 +137,5 @@
 <script src="../gesture/setup.js"></script>
 <script type="module" src="../gesture/engine.js"></script>
 <script type="module" src="devices.js"></script>
+<script type="module" src="orb-ui.js"></script>
+<script type="module" src="plugins-ui.js"></script>

@@ -1,18 +1,25 @@
 // Minimal port of myiris' Gemini Live session (electron/live-session.mjs,
 // live-config.mjs, live-messages.mjs). The API key stays in the main process;
 // the renderer only captures the mic and plays audio.
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { GoogleGenAI } from "@google/genai";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
 import { cleanTools, desktopTools } from "./desktop.mjs";
 import { keyFormatOk, liveSetup } from "./live-config.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
+import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
+import { cleanPluginConfig, createHooks, loadPlugins, NAME, trustHash } from "./hooks.mjs";
+import { pluginEntry } from "./plugin-list.mjs";
 import { closeHud, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
+
+const execFileP = promisify(execFile);
 
 // Everything open-iris saves lives in ~/.open-iris/ (.env, config.json, logs/).
 const home = path.join(os.homedir(), ".open-iris");
@@ -37,7 +44,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), welcomed: c?.welcomed === true });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), welcomed: c?.welcomed === true });
 const writeConfig = (c) => fs.writeFileSync(configFile, JSON.stringify(clean(c), null, 2) + "\n");
 function readConfig() {
   try { return clean(JSON.parse(fs.readFileSync(configFile, "utf8"))); } catch { return clean(); }
@@ -73,6 +80,15 @@ const send = (channel, payload) => {
 let muted = false; // HUD 🔇: mic chunks are dropped here, the session stays open
 let listenOnly = false; // 👂: Iris's audio and transcript are dropped and tools refused, the mic still goes in
 let announcing = null; // timer while Iris says "listen mode is on": its output passes the listen-only gate until then
+let hooks = null; // plugin hooks (hooks.mjs) of this session
+let userSaid = "", irisSaid = ""; // transcript of the current turn, for UserTurn/IrisTurn hooks
+// trust.json: { [plugin]: sha256 } approved in the Plugin tab. File trust boundary: only names and strings survive.
+const trustFile = path.join(home, "trust.json");
+function readTrust() {
+  try {
+    return Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(trustFile, "utf8"))).filter(([k, v]) => NAME.test(k) && typeof v === "string"));
+  } catch { return {}; }
+}
 
 // A second live:start while one is still connecting is a no-op.
 let starting = false;
@@ -98,8 +114,25 @@ async function connectLive(opts) {
   // IRIS.md and skills are read here, once: edits apply from the next Start, like the tool switches.
   const skills = loadSkills(home, (m) => log("WARN", "skills", m)).filter((s) => skillOn[s.name] !== false);
   enabledTools = desktopTools().filter((t) => tools[t.name]).concat(skillTools(skills));
-  const brief = personaBrief(loadOwner(home), skills);
-  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"}`);
+  // Plugins (hooks.mjs) are read here too: plugin folders and trust apply from the next Start; switches and fields at each event.
+  const plugins = loadPlugins(home, (m) => log("WARN", "plugins", m));
+  hooks?.stop();
+  hooks = createHooks({
+    plugins, getConfig: () => readConfig().plugins, trust: readTrust(), home, lang,
+    send: (text) => {
+      if (!session || listenOnly) return false; // kept, retried next second (createHooks)
+      try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true }); } catch (e) { log("ERROR", "plugins", `speak: ${e?.message || e}`); return false; }
+      return true;
+    },
+    addContext: (text) => {
+      try { session?.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "plugins", `context: ${e?.message || e}`); }
+    },
+    log: (m) => log("INFO", "plugins", m),
+  });
+  userSaid = irisSaid = "";
+  const start = await hooks.emit("SessionStart");
+  const brief = personaBrief(loadOwner(home), skills) + (start.context ? ` ${start.context}` : "");
+  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none"}`);
   chunksIn = 0;
   chunksOut = 0;
   send("live:status", "connecting");
@@ -118,6 +151,7 @@ async function connectLive(opts) {
       onopen: () => {
         log("INFO", "live", "connected");
         send("live:status", "listening");
+        hooks.start();
       },
       onmessage: handleMessage,
       onerror: (e) => {
@@ -129,6 +163,7 @@ async function connectLive(opts) {
         log("INFO", "live", `closed code=${e?.code} reason=${e?.reason || "(none)"} micChunksSent=${chunksIn}`);
         if (session !== me) return;
         session = null;
+        endHooks();
         setListenOnly(false);
         send("live:log", `closed: ${e?.code} ${e?.reason || ""}`);
         send("live:status", "offline");
@@ -148,10 +183,14 @@ function handleMessage(message) {
   }
   const content = message.serverContent;
   if (!content) return;
+  if (content.inputTranscription?.text || content.outputTranscription?.text) hooks?.markActivity(); // a speak hook waits for quiet
   if (content.inputTranscription?.text) {
     log("DEBUG", "transcript", `you: ${content.inputTranscription.text}`);
     send("live:log", `you: ${content.inputTranscription.text}`);
+    userSaid += content.inputTranscription.text;
   }
+  if (content.outputTranscription?.text && !(listenOnly && !announcing)) irisSaid += content.outputTranscription.text; // dropped words were never heard
+  if (content.turnComplete) endTurn();
   if (announcing && content.turnComplete) endAnnounce();
   else if (listenOnly && !announcing) {
     // Only the user's words show; Iris's audio and transcript are dropped.
@@ -183,9 +222,22 @@ function handleMessage(message) {
   }
 }
 
+// UserTurn/IrisTurn hooks at turnComplete. Not awaited: hooks must not hold up the audio.
+function endTurn() {
+  const h = hooks, you = userSaid.trim(), iris = irisSaid.trim();
+  userSaid = irisSaid = "";
+  if (you) h?.emit("UserTurn", { text: you }).catch((e) => log("ERROR", "plugins", `UserTurn: ${e.message}`));
+  if (iris) h?.emit("IrisTurn", { text: iris }).catch((e) => log("ERROR", "plugins", `IrisTurn: ${e.message}`));
+}
+function endHooks() {
+  const h = hooks;
+  h?.stop();
+  h?.emit("SessionEnd").catch((e) => log("ERROR", "plugins", `SessionEnd: ${e.message}`));
+}
+
 const cancelledCalls = new Set();
 async function handleToolCalls(calls) {
-  const s = session;
+  const s = session, h = hooks;
   if (listenOnly) {
     log("INFO", "tool", `refused in listen-only: ${calls.map((c) => c.name).join(",")}`);
     try { s?.sendToolResponse({ functionResponses: refuseCalls(calls) }); } catch (e) { log("ERROR", "tool", `sendToolResponse: ${e?.message || e}`); }
@@ -193,12 +245,16 @@ async function handleToolCalls(calls) {
   }
   const functionResponses = await Promise.all(calls.map(async ({ id, name, args }) => {
     const tool = enabledTools.find((t) => t.name === name);
+    const pre = (await h?.emit("PreToolCall", { tool: { name, args } })) ?? { block: false, context: "" };
+    if (pre.block) return { id, name, response: { error: pre.reason } }; // emit already logged who blocked it
     // Desktop calls queue up in call order (a click then a type must not race); skill calls run in parallel.
     const r = !tool ? { ok: false, error: `tool not enabled: ${name}` } : tool.desktop ? await (desktopQueue = desktopQueue.then(() => runDesktop(tool, args))) : await tool.run(args);
     const out = r.ok ? { output: r.output } : { error: r.error };
     log("INFO", "tool", `${name} ${JSON.stringify(args || {}).slice(0, 80)} -> ${r.ok ? "ok" : "error"} ${JSON.stringify(out).length}B`);
     if (!r.ok && tool?.desktop) log("WARN", "tool", `${name} ${JSON.stringify(r.error).slice(0, 2000)}`); // why a type or click failed, for the eval loop
-    return { id, name, response: out };
+    const post = (await h?.emit("PostToolCall", { tool: { name, args }, result: out })) ?? { context: "" };
+    const context = [pre.context, post.context].filter(Boolean).join(" ");
+    return { id, name, response: context ? { ...out, context } : out };
   }));
   // A cancelled call's response is never sent, nor any response for a session that has ended since.
   const live = functionResponses.filter((f) => !cancelledCalls.delete(f.id));
@@ -218,6 +274,7 @@ function stopLive() {
   if (session) log("INFO", "live", "stop requested");
   const s = session;
   session = null;
+  if (s) endHooks();
   try { s?.close(); } catch { /* ignore close races */ }
   send("live:interrupt");
   send("live:status", "offline");
@@ -243,6 +300,7 @@ function setListenOnly(on) {
       announcing = setTimeout(endAnnounce, 8000);
     }
     try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: on ? LISTEN_ON_EVENT : LISTEN_OFF_EVENT }] }], turnComplete: true }); } catch (e) { log("ERROR", "live", `listen notice: ${e?.message || e}`); }
+    hooks?.emit("ListenOnlyChanged", { listen_only: on }).catch((e) => log("ERROR", "plugins", `ListenOnlyChanged: ${e.message}`));
   }
   send("live:listen", on);
 }
@@ -251,12 +309,113 @@ function endAnnounce() {
   announcing = null;
 }
 
-ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, owner: loadOwner(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })) } }));
+ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, owner: loadOwner(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })), plugins: loadPlugins(home) } }));
 ipcMain.handle("owner:set", (_e, text) => saveOwner(home, text));
 ipcMain.handle("skills:open", () => {
   const dir = path.join(home, "skills");
   fs.mkdirSync(dir, { recursive: true });
   return shell.openPath(dir); // "" or macOS's error text
+});
+ipcMain.handle("plugins:open", () => {
+  const dir = path.join(home, "plugins");
+  fs.mkdirSync(dir, { recursive: true });
+  return shell.openPath(dir); // "" or macOS's error text
+});
+// Tab Plugin › add: a folder on this Mac or a GitHub link is scanned first, then the user ticks which plugins to copy into
+// ~/.open-iris/plugins/ (all off). One pending source at a time; a clone sits in a temp folder until install or the next scan.
+let adding = null; // { dir, tmp? }
+const dropAdding = () => {
+  if (adding?.tmp) fs.rmSync(adding.tmp, { recursive: true, force: true });
+  adding = null;
+};
+app.on("will-quit", dropAdding);
+const scanned = (source) => ({ source, plugins: scanPlugins(adding.dir, path.join(home, "plugins")) });
+ipcMain.handle("plugins:scan-folder", async (e) => {
+  const pick = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), { properties: ["openDirectory"] });
+  if (pick.canceled || !pick.filePaths[0]) return { canceled: true };
+  dropAdding();
+  adding = { dir: pick.filePaths[0] };
+  return scanned(adding.dir);
+});
+ipcMain.handle("plugins:scan-url", async (_e, url) => {
+  const gh = parseGithubUrl(url);
+  if (!gh) throw new Error("not a https://github.com/<owner>/<repo> link");
+  dropAdding();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "open-iris-clone-"));
+  const clone = path.join(tmp, "repo");
+  try {
+    await execFileP("git", ["clone", "--depth", "1", ...(gh.branch ? ["--branch", gh.branch] : []), "--", gh.repo, clone], { timeout: 120_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+    const dir = fs.realpathSync(path.join(clone, gh.sub)); // throws if the folder is not in the repo
+    if (dir !== fs.realpathSync(clone) && !dir.startsWith(fs.realpathSync(clone) + path.sep)) throw new Error(`${gh.sub} points outside the repo`);
+    adding = { dir, tmp };
+  } catch (err) {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    const why = err.code === "ENOENT" && err.path === "git" ? "git is not installed" : err.code === "ENOENT" ? `${gh.sub} is not in that repo` : String(err.stderr || err.message).trim().split("\n").pop();
+    log("WARN", "plugins", `clone ${gh.repo} ${gh.branch} ${gh.sub}: ${why}`);
+    throw new Error(why);
+  }
+  log("INFO", "plugins", `cloned ${gh.repo} ${gh.branch} ${gh.sub}`);
+  return scanned(url.trim());
+});
+// picks: scanPlugins paths the user ticked; [] cancels. The pending source is dropped either way.
+ipcMain.handle("plugins:install", (_e, picks) => {
+  if (!adding) throw new Error("scan a folder or a link first");
+  try {
+    const result = installFrom(adding.dir, path.join(home, "plugins"), Array.isArray(picks) ? picks.filter((p) => typeof p === "string") : []);
+    log("INFO", "plugins", `add ${adding.dir} → installed [${result.installed}] errors ${JSON.stringify(result.errors)}`);
+    return result;
+  } finally {
+    dropAdding();
+  }
+});
+// Tab Plugin: one card per plugin folder, with its saved values and trust state (plugin-list.mjs).
+const listPlugins = () => {
+  const { plugins: config, lang } = readConfig();
+  const trust = readTrust();
+  return loadPlugins(home, (m) => log("WARN", "plugins", m)).map((p) => pluginEntry(p, config[p.name], trust[p.name], trustHash, lang));
+};
+ipcMain.handle("plugins:list", () => listPlugins());
+// The renderer sends only the name: main hashes the folder itself. Applies from the next Start.
+ipcMain.handle("plugins:trust", (_e, name) => {
+  const p = loadPlugins(home).find((x) => x.name === name && !x.error);
+  if (!p) throw new Error(`no loadable plugin named ${name}`);
+  fs.writeFileSync(trustFile, JSON.stringify({ ...readTrust(), [p.name]: trustHash(p.dir) }, null, 2) + "\n");
+  log("INFO", "plugins", `trusted ${p.name}`);
+  return listPlugins().find((x) => x.name === p.name);
+});
+// Tab Plugin › Remove: asks with a native box, then deletes the folder, its trust and its saved settings.
+// A running session keeps the plugin it loaded until the next Start.
+ipcMain.handle("plugins:remove", async (e, name) => {
+  const root = path.join(home, "plugins");
+  let names = [];
+  try { names = fs.readdirSync(root).filter((n) => !n.startsWith(".")); } catch {}
+  if (typeof name !== "string" || !names.includes(name)) throw new Error(`no plugin named ${name}`); // only a folder that is there: no paths
+  const en = readConfig().lang === "en";
+  const { response } = await dialog.showMessageBox(BrowserWindow.fromWebContents(e.sender), {
+    type: "warning", buttons: en ? ["Remove", "Cancel"] : ["Gỡ", "Huỷ"], defaultId: 1, cancelId: 1,
+    message: en ? `Remove the plugin ${name}?` : `Gỡ plugin ${name}?`,
+    detail: en ? `Deletes ~/.open-iris/plugins/${name} with its settings and trust.` : `Xoá ~/.open-iris/plugins/${name} cùng cài đặt và tin cậy của nó.`,
+  });
+  if (response !== 0) return false;
+  fs.rmSync(path.join(root, name), { recursive: true, force: true });
+  const { [name]: _t, ...trust } = readTrust();
+  fs.writeFileSync(trustFile, JSON.stringify(trust, null, 2) + "\n");
+  const saved = readConfig();
+  const { [name]: _c, ...plugins } = saved.plugins;
+  writeConfig({ ...saved, plugins });
+  log("INFO", "plugins", `removed ${name}`);
+  return true;
+});
+// Tab Plugin: { name, on?, fields?, groups?: { [group]: { on?, every_min? } } } for one plugin, merged over what is saved; clean() checks every value.
+ipcMain.handle("config:plugin", (_e, patch) => {
+  const saved = readConfig();
+  const name = typeof patch?.name === "string" ? patch.name : "";
+  const cur = saved.plugins[name] || {};
+  const groups = { ...cur.groups };
+  for (const [g, v] of Object.entries(patch?.groups && typeof patch.groups === "object" ? patch.groups : {})) groups[g] = { ...groups[g], ...v };
+  const next = { ...cur, ...(patch?.on !== undefined && { on: patch.on }), fields: { ...cur.fields, ...patch?.fields }, groups };
+  writeConfig({ ...saved, plugins: { ...saved.plugins, [name]: next } });
+  log("INFO", "plugins", `settings ${name} ${JSON.stringify({ on: patch?.on, fields: Object.keys(patch?.fields || {}), groups: patch?.groups })}`);
 });
 ipcMain.handle("config:lang", (_e, lang) => writeConfig({ ...readConfig(), lang })); // UI + Gemini language; clean() drops unknown values
 ipcMain.handle("config:mic", (_e, mic) => {

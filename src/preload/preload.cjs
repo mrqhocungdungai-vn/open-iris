@@ -10,6 +10,14 @@ contextBridge.exposeInMainWorld("iris", {
   saveMic: (mic) => ipcRenderer.invoke("config:mic", mic), // { id, label } or null = system default
   saveOwner: (text) => ipcRenderer.invoke("owner:set", text), // ~/.open-iris/IRIS.md
   openSkills: () => ipcRenderer.invoke("skills:open"), // "" or an error text
+  openPlugins: () => ipcRenderer.invoke("plugins:open"), // ~/.open-iris/plugins; "" or an error text
+  scanPluginFolder: () => ipcRenderer.invoke("plugins:scan-folder"), // folder picker → { source, plugins } or { canceled }
+  scanPluginUrl: (url) => ipcRenderer.invoke("plugins:scan-url", url), // git clone --depth 1 of a GitHub link → { source, plugins }
+  installPlugins: (picks) => ipcRenderer.invoke("plugins:install", picks), // ticked scan paths ([] cancels) → { installed, errors }
+  savePlugin: (patch) => ipcRenderer.invoke("config:plugin", patch), // { name, on?, fields?, groups?: { [group]: { on?, every_min? } } }
+  listPlugins: () => ipcRenderer.invoke("plugins:list"), // Plugin tab cards; main rebuilds it on every call
+  removePlugin: (name) => ipcRenderer.invoke("plugins:remove", name), // main asks first → true if removed
+  trustPlugin: (name) => ipcRenderer.invoke("plugins:trust", name), // main hashes the folder into ~/.open-iris/trust.json
   start: (opts) => ipcRenderer.invoke("live:start", opts),
   stop: () => ipcRenderer.invoke("live:stop"),
   sendAudio: (arrayBuffer) => ipcRenderer.send("live:audio-in", arrayBuffer),
@@ -19,6 +27,10 @@ contextBridge.exposeInMainWorld("iris", {
   closeGallery: () => ipcRenderer.send("gallery:close"),
   galleryEnabled: (on) => ipcRenderer.send("gallery:enabled", on), // Features switch → HUD 🖼 button
   onGalleryEnabled: on("gallery:enabled"),
+  orbEnabled: (on) => ipcRenderer.send("orb:enabled", on), // Features › Orb switch → HUD orb
+  onOrbEnabled: on("orb:enabled"),
+  orb: (input) => ipcRenderer.send("orb", input), // main window → HUD orb
+  onOrb: on("orb"),
   onGallery: on("gallery"),
   galleryItem: (index) => ipcRenderer.invoke("gallery:item", index), // folder: go in, other file: open in its app
   galleryLook: (index) => ipcRenderer.send("gallery:look", index), // image in the viewer (-1 = none), for Iris

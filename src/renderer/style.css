@@ -53,7 +53,7 @@ a { color: inherit; text-underline-offset: 0.16em; }
 main { position: relative; flex: 1; min-height: 0; display: flex; }
 main > section { display: none; flex: 1; min-width: 0; min-height: 0; flex-direction: column; gap: 12px; }
 main > .scroll { overflow-y: auto; gap: 0; }
-body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-feat:checked) #p-feat { display: flex; }
+body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-feat:checked) #p-feat, body:has(#t-plug:checked) #p-plug { display: flex; }
 .scroll > h2:first-child { margin-top: 0; }
 
 /* Settings: one per line, name on the left, control on the right. */
@@ -98,10 +98,13 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 #log .sys, #log .err { font-size: 12px; }
 #log .err { color: #e8907f; }
 
-/* Hand Task Vision camera: picture-in-picture in the bottom-right corner, 4:3, mirrored like a selfie,
+/* Bottom strip, under the tabs: orb left, #run buttons middle, camera right. A real row, so the tab above shrinks instead of being covered;
+   the buttons always keep it on screen. */
+#corner { display: flex; align-items: flex-end; gap: 12px; }
+
+/* Hand Task Vision camera: right end of the strip, 4:3, mirrored like a selfie,
    status top-right and pose bottom-left as chips over the video. */
-#hv-view { position: absolute; right: 8px; bottom: 8px; z-index: 1; width: 200px; max-width: 45%; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: var(--stage); color: var(--on-stage); box-shadow: 0 0 0 1px rgb(250 249 245 / 0.14); font-size: 11px; }
-main:has(#hv-view:not([hidden])) :is(#log, .scroll) { padding-bottom: 166px; } /* the newest lines scroll clear of the camera */
+#hv-view { position: relative; margin-left: auto; width: 200px; max-width: 45%; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: var(--stage); color: var(--on-stage); box-shadow: 0 0 0 1px rgb(250 249 245 / 0.14); font-size: 11px; }
 #hv-view video, #hv-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 #hv-status, #hv-pose { position: absolute; padding: 2px 8px; border-radius: 999px; background: rgb(0 0 0 / 0.6); }
 #hv-status { top: 6px; right: 6px; }
@@ -113,11 +116,20 @@ main:has(#hv-view:not([hidden])) :is(#log, .scroll) { padding-bottom: 166px; } /
 #hv-view.mini { width: auto; max-width: calc(100% - 16px); aspect-ratio: auto; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 999px; }
 #hv-view.mini :is(video, canvas) { width: 1px; height: 1px; opacity: 0; } /* still on the page: the engine reads frames from the video */
 #hv-view.mini :is(#hv-hide, #hv-status, #hv-pose) { position: static; }
-main:has(#hv-view.mini:not([hidden])) :is(#log, .scroll) { padding-bottom: 44px; }
+
+/* Orb: left end of the strip, drawn by orb.js. */
+#orb { order: -1; width: 150px; height: 150px; display: grid; place-items: center; pointer-events: none; }
+#orb canvas { width: 140px; height: 140px; }
+/* No 2D context: a dot in the state's colour. */
+.orb-dot { border-radius: 50%; transform: scale(0.4); background: rgb(120 128 140); }
+.orb-dot[data-state="listening"] { background: rgb(72 196 150); }
+.orb-dot[data-state="speaking"] { background: rgb(47 143 224); }
+.orb-dot[data-state="thinking"] { background: rgb(212 160 40); }
+.orb-dot[data-state="listenOnly"] { background: rgb(150 138 205); }
 
 /* Bottom row: Start, Mic, Gallery, the status with its dot, HUD. */
-#run { display: flex; gap: 8px; align-items: center; }
-#status { flex: 1; min-width: 0; color: var(--muted); }
+#run { flex: 1; min-width: 0; align-self: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; } /* in #corner, between orb and camera */
+#status { min-width: 0; color: var(--muted); }
 #status::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--line); }
 #status[data-state="connecting"]::before { background: var(--wait); }
 #status[data-state="listening"]::before { background: var(--ok); }
@@ -139,3 +151,38 @@ dialog::backdrop { background: rgb(0 0 0 / 0.45); overflow: hidden; overscroll-b
 .w-nav { display: flex; justify-content: space-between; margin-top: 16px; }
 .w-nav .cta { margin-left: auto; border-color: transparent; background: var(--cta); color: var(--on-cta); }
 #w-tut li { margin-bottom: 6px; }
+
+/* Plugin tab (plugins-ui.js): one card per plugin, its hook groups as rows. */
+.plugin { margin-top: 12px; padding: 12px; border: 1px solid var(--hair); border-radius: 12px; background: var(--card); }
+.plugin > .feature { padding-top: 0; }
+.plugin h3 { margin: 12px 0 0; font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.plugin .row input[type="text"], .every input { min-width: 0; min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+.plugin .row input[type="text"] { width: 100%; box-sizing: border-box; }
+.plugin:has(> .feature [role="switch"]:not(:checked)) :is(.row, h3, .group, .trust) { opacity: 0.55; } /* plugin off: its settings stay editable, dimmed */
+.plugin.broken { border-color: var(--bad); background: var(--error-bg); }
+.group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--hair); }
+.group > label { display: flex; gap: 8px; align-items: center; font-weight: 500; }
+.ev { padding: 1px 8px; border-radius: 999px; background: var(--card-2); color: var(--text-2); font: 11px ui-monospace, monospace; }
+.every { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--text-2); }
+.every input { width: 60px; }
+.cmd { flex-basis: 100%; margin: 0; padding: 4px 8px; border-radius: 6px; background: var(--stage); color: var(--on-stage); font: 12px ui-monospace, monospace; overflow-x: auto; }
+.trust { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 10px; border-radius: 8px; background: var(--card-2); font-size: 13px; }
+.trust.need { background: var(--error-bg); }
+.trust button { margin-left: auto; }
+#plug-error { margin: 8px 0 0; padding: 8px 12px; border: 1px solid var(--bad); border-radius: 8px; background: var(--error-bg); overflow-wrap: anywhere; }
+#p-plug > .perm-actions { margin-top: 12px; }
+#trust-dlg { max-width: 520px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); }
+#trust-dlg h3 { margin-top: 0; }
+#trust-dlg ul { padding-left: 18px; }
+#trust-dlg li { margin: 8px 0; overflow-wrap: anywhere; }
+#trust-dlg .warn { padding: 8px 10px; border-radius: 8px; background: var(--error-bg); }
+#trust-dlg menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; }
+#plug-added { margin: 8px 0 0; white-space: pre-line; overflow-wrap: anywhere; color: var(--muted); }
+#plug-added.bad { color: var(--bad); }
+#plug-url { padding-top: 0; }
+#plug-url-in { flex: 1; min-width: 220px; min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+#plug-pick { margin-top: 8px; padding: 12px; border: 1px solid var(--hair); border-radius: 12px; background: var(--card); }
+#plug-pick > p { margin: 0 0 4px; overflow-wrap: anywhere; }
+#plug-pick .pick { display: flex; gap: 8px; align-items: baseline; min-height: 36px; padding: 6px 0; border-bottom: 1px solid var(--hair); overflow-wrap: anywhere; }
+#plug-pick .pick.bad { color: var(--muted); }
+.plugin > .perm-actions { padding-bottom: 0; }

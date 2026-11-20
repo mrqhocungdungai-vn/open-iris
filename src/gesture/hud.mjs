@@ -85,6 +85,9 @@ let dock = false; // HUD switch
 let gallery = null; // the open gallery ({ folder, items }) or null
 let galleryOn = false; // Features › Gallery View switch: the HUD shows its 🖼 only while on
 ipcMain.on("gallery:enabled", (_e, on) => broadcast("gallery:enabled", (galleryOn = on === true)));
+let orbOn = true; // Features › Orb switch: the HUD shows its orb only while on
+ipcMain.on("orb:enabled", (_e, on) => broadcast("orb:enabled", (orbOn = on === true)));
+ipcMain.on("orb", (_e, input) => win?.webContents.send("orb", input)); // { state, inL, outL } from the main window, which owns the audio
 let control = false; // armed by 🤘 hold or Ctrl+Option+G after vision starts, so a real mouse isn't fought on switch-on
 let vision = false; // Hand Task Vision: the main window switches it on at launch once permissions are granted (gesture/setup.js)
 
@@ -240,6 +243,7 @@ function openHud() {
     win.webContents.send("hud", dock);
     win.webContents.send("gallery", gallery);
     win.webContents.send("gallery:enabled", galleryOn);
+    win.webContents.send("orb:enabled", orbOn);
   });
   win.on("closed", () => {
     win = null;
