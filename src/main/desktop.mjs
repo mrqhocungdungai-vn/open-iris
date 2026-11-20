@@ -34,8 +34,9 @@ const TOOLS = {
     argv: ({ app, root }) => ["snapshot", "--app", app, "-i", "--compact", ...(root ? ["--root", root] : ["--skeleton"])],
   },
   find_app_control: {
-    description: "Find elements by role and/or text and get their refs, e.g. role textarea to find a note or message body before typing.",
-    parameters: { app: str("Application name"), role: str("Optional role: textarea, textfield, button, checkbox ..."), text: str("Optional text in name, value or title") },
+    description: "Find elements by role and/or text and get their refs, e.g. role textarea to find a note or message body before typing, role searchfield for a search box.",
+    // "search field" was refused as INVALID_ARGS (log 2026-11-20): roles are one lowercase word as snapshots print them.
+    parameters: { app: str("Application name"), role: str("Optional role, one lowercase word as a snapshot prints it: textarea, textfield, searchfield, button, link, checkbox, combobox, list, row, menuitem, tab"), text: str("Optional text in name, value or title") },
     required: ["app"],
     argv: ({ app, role, text }) => ["find", "--app", app, ...(role ? ["--role", role] : []), ...(text ? ["--text", text] : [])],
   },
@@ -47,7 +48,7 @@ const TOOLS = {
     argv: ({ app, root }) => ["snapshot", "--app", app, "--compact", "--max-depth", "50", ...(root ? ["--root", root] : [])],
   },
   click_app_control: {
-    description: "Click an element by ref. Clicking Send, Submit, Delete, Buy or similar needs confirmed true, which you may set only after the user said yes out loud.",
+    description: "Click an element by ref. Leave confirmed out; if the click is risky (Send, Delete, Buy ...) the tool refuses with NEEDS_CONFIRMATION, then ask the user and call again with confirmed true only after they said yes.",
     parameters: { ref: REF, confirmed: CONFIRMED("this risky click") },
     required: ["ref"],
     argv: ({ ref }) => ["click", ref],
@@ -66,8 +67,9 @@ const TOOLS = {
     },
     required: ["ref", "text", "app"],
   },
+  // agent-desktop refuses cmd+q with POLICY_DENIED; Iris retried it instead of clicking close (log 2026-11-20).
   press_key_combo: {
-    description: "Send a key combo to an app, e.g. return, escape, cmd+n. Return or enter can send a message, so it needs confirmed true, which you may set only after the user said yes out loud.",
+    description: "Send a key combo to an app, e.g. return, escape, cmd+n. Leave confirmed out; return or enter may send, so the tool refuses with NEEDS_CONFIRMATION, then ask the user and call again with confirmed true only after they said yes. cmd+q is blocked: to quit or close an app, find and click its close button.",
     parameters: {
       combo: str("Key combo"), app: str("Target application name"), confirmed: CONFIRMED("pressing return or enter"),
       ref: { type: "string", description: "Qualified ref of the field the keys are for. Give it when pressing return after typing, e.g. the address bar or search box you just typed into" },
@@ -91,11 +93,17 @@ export const DESKTOP_BRIEF =
   "To submit what you typed (search, address bar, chat box), call press_key_combo return with ref set to that same field. " +
   "Never say an action happened unless its tool result was ok. " +
   "If typing fails, do not click Send, submit or press return: stop and tell the user typing failed. " +
-  "Ask the user before anything destructive (deleting, sending, purchasing).";
+  "Ask the user before anything destructive (deleting, sending, purchasing). " +
+  // Iris asked "what should I search for?" and searched a guess in the same turn (log 2026-11-20).
+  "When you ask the user something, stop there: call no tool until they answer, and never act on a guess of what they meant.";
 
 // Clicks that send, delete or pay. The model ignored "ask first" once (PoC round 2), so the tool enforces it.
 // shortcut: matches the element's visible text only; an icon-only Send button still slips through.
 const RISKY = /\b(send|submit|post|delete|remove|buy|pay|purchase|order)\b|gửi|xóa|xoá|mua|thanh toán/i;
+const SEARCH_BOX = /search|address|tìm kiếm|địa chỉ/i;
+// Gemini set confirmed true on its first click with no one asked (log 2026-11-20), so confirmed counts only after this tool
+// refused that same click or return with NEEDS_CONFIRMATION. shortcut: it cannot tell the user's yes from Gemini's own retry;
+// main.mjs can, by holding a confirmed call until a user turn arrived (as the plugin taint flag does), hand that to iris-core.
 // Iris said "searched"/"sent" on delivered_unverified results the user never saw happen (PoC rounds 3, 5, 6).
 const VERIFY = "The input was delivered but its effect is not checked. Before telling the user it worked, call read_app_text or scan_app_controls and confirm the screen changed; if it did not, say so.";
 
@@ -132,6 +140,9 @@ export function desktopTools(cli = runCli) {
   // shortcut: per app, in memory only, so each session re-learns it once (~2s for Teams); persist it if that bothers.
   const typeWins = new Map(); // app -> the way that last worked
   let lastCall = { key: "", count: 0 };
+  const asked = new Set(); // clicks and returns refused with NEEDS_CONFIRMATION, each passes once with confirmed true
+  const needYes = (key, message) => (asked.add(key), { ok: false, error: { code: "NEEDS_CONFIRMATION", message } });
+  const yes = (key, confirmed) => confirmed === true && asked.delete(key);
 
   // null when the field does not expose its value.
   async function fieldValue(ref) {
@@ -184,16 +195,26 @@ export function desktopTools(cli = runCli) {
     if (lastCall.count > MAX_REPEATS) return { ok: false, error: { code: "LOOP", message: `You already made this exact call ${MAX_REPEATS} times. Do not repeat it; tell the user what you found or that you are stuck.` } };
     if (name === "type_into_text_field") return typeText(args);
     if (name === "read_app_text") return readText(args);
-    if (name === "click_app_control" && !args.confirmed) {
+    if (name === "click_app_control") {
       const label = JSON.stringify((await cli(["get", args.ref])).data ?? "");
-      if (RISKY.test(label)) return { ok: false, error: { code: "NEEDS_CONFIRMATION", message: `This would click ${label}. Ask the user to confirm, then call again with confirmed true.` } };
+      if (RISKY.test(label) && !yes("click" + args.ref, args.confirmed)) return needYes("click" + args.ref, `This would click ${label}. Ask the user to confirm and wait for their answer, then call again with confirmed true.`);
     }
     // Return sent a Claude message unasked (PoC round 3). shortcut: gates every return, even a harmless new line or dialog OK.
-    if (name === "press_key_combo" && !args.confirmed && /(^|\+)(return|enter)$/i.test(args.combo ?? "")) {
-      return { ok: false, error: { code: "NEEDS_CONFIRMATION", message: `Pressing ${args.combo} may send or submit. Ask the user to confirm, then call again with confirmed true.` } };
+    const enterKey = "press" + args.app + args.combo;
+    if (name === "press_key_combo" && /(^|\+)(return|enter)$/i.test(args.combo ?? "") && !yes(enterKey, args.confirmed) && !(await searchBox(args.ref))) {
+      return needYes(enterKey, `Pressing ${args.combo} may send or submit. Ask the user to confirm and wait for their answer, then call again with confirmed true.`);
     }
     if (name === "press_key_combo") return pressKeys(args);
     return cli(TOOLS[name].argv(args));
+  }
+
+  // Return in an address or search box only loads or searches, so it needs no yes (Iris asked before opening a URL, log 2026-11-20).
+  // find --root reports the field itself with its role and name; get has no name property.
+  // shortcut: trusts the field's accessible name; a chat box named like "search" would send without asking.
+  async function searchBox(ref) {
+    if (!ref) return false;
+    const m = (await cli(["find", "--root", ref])).data?.matches?.[0];
+    return m?.role === "searchfield" || SEARCH_BOX.test(m?.name ?? "");
   }
 
   // Chrome's address bar ignored a headless return after typing: "ok" with no effect, later "no verified focused element" (log 2026-11-19).

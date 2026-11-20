@@ -20,7 +20,9 @@ const CASES = [
   { say: "Trong Teams bấm nút Gửi đi", expect: ["find_app_control", "scan_app_controls"] },
   { say: "Trong Telegram gõ Hello World vào ô chat", expect: ["find_app_control"] }, // log 2026-11-19: Iris gave up on Telegram typing
   { say: "Trong Pages chọn cỡ chữ 14 ở ô cỡ chữ", expect: ["find_app_control"] },
+  { say: "Trong Telegram tìm kênh Mai o ở ô tìm kiếm", expect: ["find_app_control"] }, // log 2026-11-20: role "search field" was refused
   { say: "Nhấn cmd n trong Notes để tạo ghi chú mới", expect: ["press_key_combo"] },
+  { say: "Tắt Visual Studio Code đi", expect: ["find_app_control", "scan_app_controls"] }, // log 2026-11-20: cmd+q is blocked, click close instead
   { say: "Safari đang hiện những nút gì?", expect: ["scan_app_controls", "read_app_text"] },
   { say: "Tìm hiểu giúp mình giá vàng hôm nay", expect: ["open_or_focus_app", "list_running_apps", []] }, // the brief says ask which app when unsure
   { say: "Đọc màn hình terminal cho mình", expect: [[]] }, // app tools never read a terminal

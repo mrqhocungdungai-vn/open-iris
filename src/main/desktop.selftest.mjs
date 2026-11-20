@@ -7,7 +7,10 @@ function fake(answer) {
   const calls = [];
   const cli = async (argv, stdin) => (calls.push({ argv, stdin }), answer(argv) ?? { ok: true, data: {} });
   const tools = Object.fromEntries(desktopTools(cli).map((t) => [t.name, t]));
-  return { calls, run: (name, args) => tools[name].run(args) };
+  const run = (name, args) => tools[name].run(args);
+  // A confirmed call as Gemini must make it: refused first, then sent again with the user's yes.
+  const runYes = async (name, args) => (assert.equal((await run(name, args)).error.code, "NEEDS_CONFIRMATION"), run(name, { ...args, confirmed: true }));
+  return { calls, run, runYes };
 }
 
 // cleanTools: unknown and old coding keys are dropped, missing ones get defaults, values become booleans.
@@ -33,6 +36,22 @@ for (const t of desktopTools()) assert.ok(t.desktop && t.parameters.type === "ob
   assert.deepEqual(f.calls.map((c) => c.argv[0]), ["get"]);
   assert.equal((await f.run("click_app_control", { ref: "@s:e1", confirmed: true })).ok, true);
   assert.deepEqual(f.calls.at(-1).argv, ["click", "@s:e1"]);
+  // The yes covers one click: the next Send asks again.
+  assert.equal((await f.run("click_app_control", { ref: "@s:e1", confirmed: true })).error.code, "NEEDS_CONFIRMATION");
+}
+// confirmed true sent before anyone was asked does not pass (Gemini set it on its own, log 2026-11-20).
+{
+  const f = fake((a) => (a[0] === "get" ? { ok: true, data: "Send" } : null));
+  assert.equal((await f.run("click_app_control", { ref: "@s:e1", confirmed: true })).error.code, "NEEDS_CONFIRMATION");
+  assert.ok(!f.calls.some((c) => c.argv[0] === "click"));
+  // A yes for another ref does not carry over.
+  assert.equal((await f.run("click_app_control", { ref: "@s:e2", confirmed: true })).error.code, "NEEDS_CONFIRMATION");
+  const g = fake(() => null);
+  assert.equal((await g.run("press_key_combo", { combo: "return", app: "Telegram", confirmed: true })).error.code, "NEEDS_CONFIRMATION");
+  assert.equal(g.calls.length, 0);
+  // A harmless button with confirmed true still clicks.
+  const h = fake((a) => (a[0] === "get" ? { ok: true, data: "Done" } : null));
+  assert.equal((await h.run("click_app_control", { ref: "@s:e5", confirmed: true })).ok, true);
 }
 // A harmless button clicks at once.
 {
@@ -55,21 +74,34 @@ for (const t of desktopTools()) assert.ok(t.desktop && t.parameters.type === "ob
 // Return with the field's ref: focus it, then press physically (Chrome ignored a headless return, log 2026-11-19).
 {
   const f = fake(() => null);
-  const r = await f.run("press_key_combo", { combo: "return", app: "Google Chrome", ref: "@s:e1", confirmed: true });
+  const r = await f.runYes("press_key_combo", { combo: "return", app: "Google Chrome", ref: "@s:e1" });
   assert.equal(r.ok, true);
   assert.match(r.output.verify, /read_app_text/);
-  assert.deepEqual(f.calls.map((c) => c.argv), [["--headed", "focus", "@s:e1"], ["--headed", "press", "return", "--app", "Google Chrome"]]);
+  assert.deepEqual(f.calls.map((c) => c.argv), [["find", "--root", "@s:e1"], ["--headed", "focus", "@s:e1"], ["--headed", "press", "return", "--app", "Google Chrome"]]);
+}
+// Return in an address or search box goes at once; a chat box still needs a yes (log 2026-11-20).
+{
+  const box = (name, role = "textfield") => fake((a) => (a[0] === "find" ? { ok: true, data: { matches: [{ name, role }] } } : null));
+  for (const [name, role] of [["Address and search bar"], ["Tìm kiếm"], ["", "searchfield"]]) {
+    const f = box(name, role);
+    assert.equal((await f.run("press_key_combo", { combo: "return", app: "Google Chrome", ref: "@s:e1" })).ok, true);
+    assert.deepEqual(f.calls.at(-1).argv, ["--headed", "press", "return", "--app", "Google Chrome"]);
+  }
+  const chat = box("Write a message…", "textarea");
+  assert.equal((await chat.run("press_key_combo", { combo: "return", app: "Telegram", ref: "@s:e2" })).error.code, "NEEDS_CONFIRMATION");
+  assert.ok(!chat.calls.some((c) => c.argv.includes("press")));
 }
 // A focus that fails stops there; no keys go out.
 {
   const f = fake((a) => (a[1] === "focus" ? { ok: false, error: { code: "STALE_REF" } } : null));
-  assert.equal((await f.run("press_key_combo", { combo: "return", app: "Google Chrome", ref: "@s:e1", confirmed: true })).error.code, "STALE_REF");
-  assert.equal(f.calls.length, 1);
+  assert.equal((await f.runYes("press_key_combo", { combo: "return", app: "Google Chrome", ref: "@s:e1" })).error.code, "STALE_REF");
+  assert.equal(f.calls.filter((c) => c.argv[1] === "focus").length, 1);
+  assert.ok(!f.calls.some((c) => c.argv.includes("press")));
 }
 // Without a ref, headless first; "no focused element" retries headed, other errors go back as they are.
 {
   const f = fake((a) => (a[0] === "press" ? { ok: false, error: { code: "ACTION_FAILED" } } : null));
-  assert.equal((await f.run("press_key_combo", { combo: "return", app: "Google Chrome", confirmed: true })).ok, true);
+  assert.equal((await f.runYes("press_key_combo", { combo: "return", app: "Google Chrome" })).ok, true);
   assert.deepEqual(f.calls.map((c) => c.argv[0]), ["press", "--headed"]);
   const g = fake((a) => (a[0] === "press" ? { ok: false, error: { code: "APP_NOT_FOUND" } } : null));
   assert.equal((await g.run("press_key_combo", { combo: "cmd+n", app: "Nope" })).error.code, "APP_NOT_FOUND");
