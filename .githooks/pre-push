@@ -1,0 +1,9 @@
+#!/bin/sh
+# Block a push whose new commits carry a secret. Turn on once per clone: git config core.hooksPath .githooks
+command -v gitleaks >/dev/null || { echo "pre-push: gitleaks is not installed (brew install gitleaks). Push blocked." >&2; exit 1; }
+z=0000000000000000000000000000000000000000
+while read -r lref lsha rref rsha; do
+  [ "$lsha" = "$z" ] && continue # deleting a remote branch
+  if [ "$rsha" = "$z" ]; then range="$lsha --not --remotes"; else range="$rsha..$lsha"; fi
+  gitleaks git --redact --no-banner --log-opts="$range" . || { echo "pre-push: gitleaks found a secret in $lref. Push blocked." >&2; exit 1; }
+done
