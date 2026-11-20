@@ -17,38 +17,38 @@ src/gesture/hud.mjs:182:ipcMain.handle("hud", (_e, on) => setDock(on === true));
 src/gesture/hud.mjs:183:ipcMain.on("hud:interactive", (_e, on) => win?.setIgnoreMouseEvents(on !== true, { forward: true }));
 src/gesture/hud.mjs:240:ipcMain.on("popout", () => (pop ? pop.close() : openPop()));
 src/gesture/hud.mjs:261:ipcMain.on("chat", (_e, d) => {
-src/main/main.mjs:414:ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, owner: loadOwner(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })), plugins: loadPlugins(home) } }));
-src/main/main.mjs:415:ipcMain.handle("owner:set", (_e, text) => saveOwner(home, text));
-src/main/main.mjs:416:ipcMain.handle("skills:open", () => {
-src/main/main.mjs:421:ipcMain.handle("plugins:open", () => {
-src/main/main.mjs:435:ipcMain.handle("plugins:scan-folder", async (e) => {
-src/main/main.mjs:442:ipcMain.handle("plugins:scan-url", async (_e, url) => {
-src/main/main.mjs:463:ipcMain.handle("plugins:install", (_e, picks) => {
-src/main/main.mjs:479:ipcMain.handle("plugins:list", () => listPlugins());
-src/main/main.mjs:481:ipcMain.handle("plugins:trust", (_e, name) => {
-src/main/main.mjs:490:ipcMain.handle("plugins:remove", async (e, name) => {
-src/main/main.mjs:512:ipcMain.handle("config:plugin", (_e, patch) => {
-src/main/main.mjs:522:ipcMain.handle("config:lang", (_e, lang) => writeConfig({ ...readConfig(), lang })); // UI + Gemini language; clean() drops unknown values
-src/main/main.mjs:523:ipcMain.handle("config:mic", (_e, mic) => {
-src/main/main.mjs:527:ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, keep: on !== false } })); // clean() keeps only a boolean
-src/main/main.mjs:528:ipcMain.handle("config:compose", (_e, on) => writeConfig({ ...readConfig(), compose: on !== false }));
-src/main/main.mjs:529:ipcMain.handle("config:meter", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, meter: on !== false } }));
-src/main/main.mjs:530:ipcMain.handle("config:welcomed", () => writeConfig({ ...readConfig(), welcomed: true }));
-src/main/main.mjs:532:ipcMain.handle("key:save", async (_e, key) => {
-src/main/main.mjs:547:ipcMain.handle("live:start", (_e, opts) => startLive(opts));
-src/main/main.mjs:548:ipcMain.handle("live:stop", () => stopLive());
-src/main/main.mjs:549:ipcMain.on("live:clear", () => clearContext());
-src/main/main.mjs:551:ipcMain.handle("live:input", (_e, parts, label) => {
-src/main/main.mjs:561:ipcMain.handle("live:state", () => ({ status: liveStatus, muted, listenOnly }));
-src/main/main.mjs:562:ipcMain.handle("live:history", () => history);
-src/main/main.mjs:563:ipcMain.on("iris:toggle", () => win && !win.isDestroyed() && win.webContents.send("iris:toggle"));
-src/main/main.mjs:564:ipcMain.on("iris:mute", (_e, on) => {
-src/main/main.mjs:568:ipcMain.on("iris:listen", (_e, on) => session && setListenOnly(on === true)); // only while Iris runs, like the buttons
-src/main/main.mjs:569:ipcMain.on("live:audio-in", (_e, arrayBuffer) => {
-src/main/main.mjs:606:ipcMain.handle("gallery:open", async (_e, target = os.homedir()) => {
-src/main/main.mjs:614:ipcMain.on("gallery:close", () => (setGallery(null), lookAt("")));
-src/main/main.mjs:616:ipcMain.handle("gallery:item", async (_e, i) => {
-src/main/main.mjs:626:ipcMain.on("gallery:look", (_e, i) => lookAt((Number.isInteger(i) && IMAGE_EXT.test(galleryEntries[i] ?? "") && galleryEntries[i]) || ""));
+src/main/main.mjs:440:ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, owner: loadOwner(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })), plugins: loadPlugins(home) } }));
+src/main/main.mjs:441:ipcMain.handle("owner:set", (_e, text) => saveOwner(home, text));
+src/main/main.mjs:442:ipcMain.handle("skills:open", () => {
+src/main/main.mjs:447:ipcMain.handle("plugins:open", () => {
+src/main/main.mjs:462:ipcMain.handle("plugins:scan-folder", async (e) => {
+src/main/main.mjs:469:ipcMain.handle("plugins:scan-url", async (_e, url) => {
+src/main/main.mjs:490:ipcMain.handle("plugins:install", (_e, picks) => {
+src/main/main.mjs:506:ipcMain.handle("plugins:list", () => listPlugins());
+src/main/main.mjs:508:ipcMain.handle("plugins:trust", (_e, name) => {
+src/main/main.mjs:517:ipcMain.handle("plugins:remove", async (e, name) => {
+src/main/main.mjs:540:ipcMain.handle("config:plugin", (_e, patch) => {
+src/main/main.mjs:553:ipcMain.handle("config:lang", (_e, lang) => writeConfig({ ...readConfig(), lang })); // UI + Gemini language; clean() drops unknown values
+src/main/main.mjs:554:ipcMain.handle("config:mic", (_e, mic) => {
+src/main/main.mjs:558:ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, keep: on !== false } })); // clean() keeps only a boolean
+src/main/main.mjs:559:ipcMain.handle("config:compose", (_e, on) => writeConfig({ ...readConfig(), compose: on !== false }));
+src/main/main.mjs:560:ipcMain.handle("config:meter", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, meter: on !== false } }));
+src/main/main.mjs:561:ipcMain.handle("config:welcomed", () => writeConfig({ ...readConfig(), welcomed: true }));
+src/main/main.mjs:563:ipcMain.handle("key:save", async (_e, key) => {
+src/main/main.mjs:578:ipcMain.handle("live:start", (_e, opts) => startLive(opts));
+src/main/main.mjs:579:ipcMain.handle("live:stop", () => stopLive());
+src/main/main.mjs:580:ipcMain.on("live:clear", () => clearContext());
+src/main/main.mjs:582:ipcMain.handle("live:input", (_e, parts, label) => {
+src/main/main.mjs:593:ipcMain.handle("live:state", () => ({ status: liveStatus, muted, listenOnly }));
+src/main/main.mjs:594:ipcMain.handle("live:history", () => history);
+src/main/main.mjs:595:ipcMain.on("iris:toggle", () => win && !win.isDestroyed() && win.webContents.send("iris:toggle"));
+src/main/main.mjs:596:ipcMain.on("iris:mute", (_e, on) => {
+src/main/main.mjs:600:ipcMain.on("iris:listen", (_e, on) => session && setListenOnly(on === true)); // only while Iris runs, like the buttons
+src/main/main.mjs:601:ipcMain.on("live:audio-in", (_e, arrayBuffer) => {
+src/main/main.mjs:638:ipcMain.handle("gallery:open", async (_e, target = os.homedir()) => {
+src/main/main.mjs:646:ipcMain.on("gallery:close", () => (setGallery(null), lookAt("")));
+src/main/main.mjs:648:ipcMain.handle("gallery:item", async (_e, i) => {
+src/main/main.mjs:658:ipcMain.on("gallery:look", (_e, i) => lookAt((Number.isInteger(i) && IMAGE_EXT.test(galleryEntries[i] ?? "") && galleryEntries[i]) || ""));
 
 # preload calls
 3:const on = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payload));
@@ -111,12 +111,12 @@ src/gesture/hud.mjs:250:  chat = new BrowserWindow({
 src/gesture/hud.mjs:252:    webPreferences: { preload: path.join(dir, "..", "preload", "preload.cjs") },
 src/gesture/hud.mjs:287:  win = new BrowserWindow({
 src/gesture/hud.mjs:295:    webPreferences: {
-src/main/main.mjs:666:  win = new BrowserWindow({
-src/main/main.mjs:670:    webPreferences: { preload: path.join(import.meta.dirname, "../preload/preload.cjs"), backgroundThrottling: false },
+src/main/main.mjs:698:  win = new BrowserWindow({
+src/main/main.mjs:702:    webPreferences: { preload: path.join(import.meta.dirname, "../preload/preload.cjs"), backgroundThrottling: false },
 
 # navigation guards
-src/main/main.mjs:646:  wc.setWindowOpenHandler(({ url }) => (guidePage(url, app.getAppPath()) ? { action: "allow" } : (log("WARN", "security", `window.open refused: ${url}`), { action: "deny" })));
-src/main/main.mjs:647:  wc.on("will-navigate", (e, url) => {
+src/main/main.mjs:678:  wc.setWindowOpenHandler(({ url }) => (guidePage(url, app.getAppPath()) ? { action: "allow" } : (log("WARN", "security", `window.open refused: ${url}`), { action: "deny" })));
+src/main/main.mjs:679:  wc.on("will-navigate", (e, url) => {
 
 # sinks
 src/renderer/renderer.js:132:    label.innerHTML = `<input type="checkbox" role="switch" name="${name}"> ${name}`;
@@ -126,11 +126,12 @@ src/gesture/hud.mjs:33:      execFileSync("swiftc", ["-O", src, "-o", bin], { st
 src/gesture/hud.mjs:44:  mouse = spawn(bin, [], { stdio: ["pipe", "pipe", "inherit"] });
 src/gesture/hud.mjs:135:    const [ppid, ...comm] = execFileSync("ps", ["-o", "ppid=,comm=", "-p", String(pid)], { encoding: "utf8" }).trim().split(/\s+/);
 src/gesture/hud.mjs:164:  if (PANES[kind]) shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${PANES[kind]}`);
-src/main/hooks.mjs:7:import { spawn as nodeSpawn } from "node:child_process";
-src/main/hooks.mjs:227:      child = spawn("/bin/sh", ["-c", command], { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
+src/main/hooks.mjs:8:import { spawn as nodeSpawn } from "node:child_process";
+src/main/hooks.mjs:283:      child = spawn("/bin/sh", ["-c", command], { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
+src/main/hooks.mjs:426:    child = spawn("/bin/sh", ["-c", command], { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
 src/main/main.mjs:10:import { execFile } from "node:child_process";
 src/main/main.mjs:28:const execFileP = promisify(execFile);
-src/main/main.mjs:231:  // shortcut: a cancelled call still runs to the end; its response is just not sent. Abort execFile if that matters.
-src/main/main.mjs:449:    await execFileP("git", ["clone", "--depth", "1", ...(gh.branch ? ["--branch", gh.branch] : []), "--", gh.repo, clone], { timeout: 120_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+src/main/main.mjs:238:  // shortcut: a cancelled call still runs to the end; its response is just not sent. Abort execFile if that matters.
+src/main/main.mjs:476:    await execFileP("git", ["clone", "--depth", "1", ...(gh.branch ? ["--branch", gh.branch] : []), "--", gh.repo, clone], { timeout: 120_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
 src/main/desktop.mjs:5:import { execFile } from "node:child_process";
 src/main/desktop.mjs:238:    const child = execFile(BIN, argv, { timeout: 60000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
