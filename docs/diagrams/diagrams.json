@@ -8,11 +8,11 @@
     "audience": []
   },
   {
-    "id": "d_y69hz7",
-    "name": "open-iris: cài plugin thêm gì vào lõi",
-    "file": "open-iris-cai-plugin-them-gi-vao-loi.excalidraw",
-    "kind": "c4-component",
-    "owner": "dev",
+    "id": "d_v800mm",
+    "name": "open-iris: plugin mở rộng năng lực (hook + tool shell)",
+    "file": "open-iris-plugin-mo-rong-nang-luc-hook-tool-shell.excalidraw",
+    "kind": "flow",
+    "owner": "po",
     "audience": [],
     "refines": "d_742up8#hooks"
   }

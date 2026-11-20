@@ -2241,9 +2241,9 @@
     {
       "id": "a10-label",
       "type": "text",
-      "x": 1340.394366197183,
+      "x": 1388.394366197183,
       "y": 606.2878787878788,
-      "width": 144,
+      "width": 48,
       "height": 25,
       "angle": 0,
       "strokeColor": "#868e96",
@@ -2257,15 +2257,15 @@
       "frameId": null,
       "roundness": null,
       "seed": 1564612204,
-      "version": 6,
-      "versionNonce": 1066304819,
+      "version": 7,
+      "versionNonce": 190257684,
       "isDeleted": false,
       "boundElements": null,
-      "updated": 1795161676604,
+      "updated": 1795163171898,
       "link": null,
       "locked": false,
-      "text": "emit · tools",
-      "originalText": "emit · tools",
+      "text": "emit",
+      "originalText": "emit",
       "fontSize": 20,
       "fontFamily": 6,
       "textAlign": "center",
@@ -2297,8 +2297,8 @@
       "frameId": null,
       "roundness": null,
       "seed": 1363933742,
-      "version": 6,
-      "versionNonce": 521810034,
+      "version": 7,
+      "versionNonce": 898424166,
       "isDeleted": false,
       "boundElements": [
         {
@@ -2306,7 +2306,7 @@
           "type": "text"
         }
       ],
-      "updated": 1795161676604,
+      "updated": 1795163171898,
       "link": null,
       "locked": false,
       "points": [
