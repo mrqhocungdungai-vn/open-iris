@@ -157,7 +157,7 @@ document.addEventListener("langchange", () => {
   document.querySelectorAll("#tools strong").forEach((h) => (h.textContent = groupName()));
   $("owner-state").textContent = "";
   showListen();
-  for (const id of ["guide-link", "hud-guide-link", "gallery-guide-link"]) $(id).search = "?lang=" + document.documentElement.lang;
+  for (const a of document.querySelectorAll('a[href$="guide.html"]')) a.search = "?lang=" + document.documentElement.lang; // Features tab + the ? menu
   showStatus();
   showMute();
   $("toggle").textContent = mic ? tr("Dừng", "Stop") : tr("Bắt đầu", "Start");
@@ -203,13 +203,17 @@ window.iris.onStatus((status) => {
 window.iris.onToggle(() => $("toggle").click()); // 🎙 on the HUD
 // Mic mute: main.mjs drops the mic chunks, the session stays open; the HUD 🎤 button shares this state.
 let muted = false;
-const showMute = () => ($("mute").textContent = muted ? tr("🔇 Mic tắt", "🔇 Mic off") : "🎤 Mic");
+// Icon only (the strip is narrow); the words go to the tooltip and the screen reader.
+const showMute = () => {
+  $("mute").textContent = muted ? "🔇" : "🎤";
+  $("mute").title = $("mute").ariaLabel = muted ? tr("Mic tắt", "Mic off") : "Mic";
+};
 window.iris.onMute((m) => ((muted = m), showMute()));
 $("mute").onclick = () => window.iris.mute(!muted);
 // Listen-only: main.mjs drops Iris's audio and refuses tools; the HUD 👂 button shares this state.
 let listenOnly = false;
 function showListen() {
-  $("listen").textContent = listenOnly ? tr("👂 Đang chỉ nghe", "👂 Listening only") : tr("👂 Chỉ nghe", "👂 Listen only");
+  $("listen").ariaLabel = listenOnly ? tr("Đang chỉ nghe", "Listening only") : tr("Chỉ nghe", "Listen only");
   $("listen").ariaPressed = listenOnly;
 }
 window.iris.onListen((on) => ((listenOnly = on), showListen(), showStatus()));

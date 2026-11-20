@@ -14,6 +14,13 @@
     <input type="radio" name="tab" id="t-feat" /><label for="t-feat" data-en="Features">Tính năng</label>
     <input type="radio" name="tab" id="t-plug" /><label for="t-plug" lang="en">Plugin</label>
   </fieldset>
+  <!-- Help for the whole app: one place for every guide. -->
+  <button id="help" popovertarget="help-menu" title="Trợ giúp" data-en-title="Help" aria-label="Trợ giúp" data-en-aria-label="Help">?</button>
+  <nav id="help-menu" popover>
+    <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" data-en="HUD guide: buttons, shortcuts">Hướng dẫn HUD: các nút, phím tắt</a>
+    <a href="../gesture/guide.html" target="_blank" data-en="Gesture guide">Hướng dẫn cử chỉ</a>
+    <a href="../gesture/gallery-guide.html" target="_blank" data-en="Gallery View guide">Hướng dẫn Gallery View</a>
+  </nav>
 </header>
 <main>
 <!-- Conversation first: the log fills the window. -->
@@ -83,9 +90,9 @@
 </section>
 </main>
 <p id="error" role="alert" hidden></p>
-<!-- Bottom strip on every tab: orb left, the run buttons in the middle, Hand Task Vision camera right. A row of its own, so it never covers a tab. -->
+<!-- Bottom strip on every tab: orb left, the run buttons in the middle (buttons + HUD row; status left, context right), Hand Task Vision camera right. A row of its own, so it never covers a tab. -->
 <div id="corner">
-<div id="run"><button id="toggle">Bắt đầu</button> <button id="mute" disabled>🎤 Mic</button> <button id="listen" disabled aria-pressed="false" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂 Chỉ nghe</button> <button id="gallery-open" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼 Gallery</button><span id="status" role="status" data-state="offline">Chưa chạy</span> <span id="ctx" hidden><span class="bar"><span class="fill"></span><span class="mark"></span></span><span></span></span> <button id="ctx-clear" hidden title="Bắt đầu phiên mới: Iris quên toàn bộ cuộc trò chuyện này" data-en-title="Start a new session: Iris forgets this whole conversation"><span data-en="↺ Start over">↺ Làm mới</span></button> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label> <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" title="Hướng dẫn HUD: các nút, phím tắt" data-en-title="HUD guide: buttons, shortcuts" aria-label="Hướng dẫn HUD" data-en-aria-label="HUD guide">?</a></div>
+<div id="run"><div class="acts"><button id="toggle">Bắt đầu</button> <button id="mute" class="icon" disabled title="Mic" aria-label="Mic">🎤</button> <button id="listen" class="icon" disabled aria-pressed="false" aria-label="Chỉ nghe" data-en-aria-label="Listen only" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂</button> <button id="gallery-open" class="icon" aria-label="Gallery" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼</button> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label></div><div class="line"><span id="status" role="status" data-state="offline">Chưa chạy</span> <span class="ctx-slot"><span id="ctx" hidden><span class="bar"><span class="fill"></span><span class="mark"></span></span><span></span></span> <button id="ctx-clear" hidden title="Bắt đầu phiên mới: Iris quên toàn bộ cuộc trò chuyện này" data-en-title="Start a new session: Iris forgets this whole conversation" aria-label="Làm mới" data-en-aria-label="Start over">↺</button></span></div></div>
 <!-- Hand Task Vision camera: right end of the strip while vision is on. -->
 <div id="hv-view" class="camera-frame" hidden>
   <video id="hv-cam" autoplay muted playsinline></video>

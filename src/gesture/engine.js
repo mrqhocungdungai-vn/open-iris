@@ -47,7 +47,13 @@ function release() {
   held = false;
 }
 
-const showStatus = () => ($("hv-status").textContent = control ? tr("điều khiển BẬT", "control ON") : tr("điều khiển TẮT · giữ 🤘 hoặc ⌃⌥G để bật", "control OFF · hold 🤘 or ⌃⌥G to activate"));
+// Short line under the 200px preview; the full hint is the tooltip. .on turns the dot green (also the only thing left when collapsed).
+function showStatus() {
+  const el = $("hv-status");
+  el.textContent = control ? tr("tay BẬT", "hand ON") : tr("tay TẮT · giữ 🤘", "hand OFF · hold 🤘");
+  el.title = control ? tr("điều khiển BẬT · giữ 🤘 hoặc ⌃⌥G để tắt", "control ON · hold 🤘 or ⌃⌥G to pause") : tr("điều khiển TẮT · giữ 🤘 hoặc ⌃⌥G để bật", "control OFF · hold 🤘 or ⌃⌥G to activate");
+  el.classList.toggle("on", control);
+}
 window.gesture.onControl((on) => {
   control = on;
   if (!on) release();
@@ -128,6 +134,7 @@ function showPose(lm, pose, ring = null, progress = 0, approach = 0) {
   }
   const ratios = lm ? ` · trỏ ${pinchRatio(lm, 8).toFixed(2)} giữa ${pinchRatio(lm, 12).toFixed(2)}` : "";
   $("hv-pose").textContent = pose;
+  $("hv-pose").title = pose; // the chip is cut with … in the 200px preview
   if (pose !== lastPose) console.info(`gesture ${pose}${ratios}${control ? "" : " (control OFF)"}`); // ratios: to tune the pinch thresholds
   lastPose = pose;
   const at = anchor ?? cursor;

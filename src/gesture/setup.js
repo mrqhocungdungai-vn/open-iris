@@ -99,7 +99,7 @@
     const why = file && (await window.iris.openGallery(file).catch((e) => e.message));
     if (why) $("error").textContent = tr("Không mở được gallery: ", "Could not open the gallery: ") + why, ($("error").hidden = false);
   });
-  // ▾ on the preview: collapse it to one line (only the recognised pose), ▴ opens it again. This window only; the HUD has its own 📷.
+  // ▾ on the preview: collapse it to one line (status dot + pose), ▴ opens it again. This window only; the HUD has its own 📷.
   $("hv-hide").onclick = () => {
     const mini = $("hv-view").classList.toggle("mini");
     $("hv-hide").setAttribute("aria-pressed", mini);

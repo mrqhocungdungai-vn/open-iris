@@ -100,26 +100,31 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 
 /* Bottom strip, under the tabs: orb left, #run buttons middle, camera right. A real row, so the tab above shrinks instead of being covered;
    the buttons always keep it on screen. */
-#corner { display: flex; align-items: flex-end; gap: 12px; }
-
-/* Hand Task Vision camera: right end of the strip, 4:3, mirrored like a selfie,
-   status top-right and pose bottom-left as chips over the video. */
-#hv-view { position: relative; margin-left: auto; width: 200px; max-width: 45%; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: var(--stage); color: var(--on-stage); box-shadow: 0 0 0 1px rgb(250 249 245 / 0.14); font-size: 11px; }
-#hv-view video, #hv-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-#hv-status, #hv-pose { position: absolute; padding: 2px 8px; border-radius: 999px; background: rgb(0 0 0 / 0.6); }
-#hv-status { top: 6px; right: 6px; }
-#hv-pose { bottom: 6px; left: 6px; font-weight: 500; color: #6cc4ff; }
+#corner { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "orb run cam"; align-items: end; gap: 12px; }
+/* Hand Task Vision camera: right end of the strip, always 200px wide (expanded or collapsed) so the middle column never resizes.
+   Video 4:3 mirrored like a selfie with ⧉ ▾ top-right and the pose bottom-left; the hand status is a caption bar under it. */
+#hv-view { position: relative; grid-area: cam; display: grid; grid-template-areas: "v" "b"; width: 200px; border-radius: 8px; overflow: hidden; background: var(--stage); color: var(--on-stage); box-shadow: 0 0 0 1px rgb(250 249 245 / 0.14); font-size: 11px; }
+#hv-view video, #hv-view canvas { grid-area: v; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; transform: scaleX(-1); }
+#hv-pose { grid-area: v; align-self: end; justify-self: start; max-width: calc(100% - 20px); margin: 6px; padding: 2px 8px; border-radius: 999px; background: rgb(0 0 0 / 0.6); font-weight: 500; color: #6cc4ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hv-status { grid-area: b; padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hv-status::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--line); }
+#hv-status.on::before { background: var(--ok); }
 #hv-status:empty, #hv-pose:empty { display: none; }
-#hv-hide { position: absolute; top: 4px; left: 4px; display: grid; place-items: center; min-block-size: 0; min-inline-size: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--on-stage); color: var(--stage); font-size: 22px; font-weight: 700; line-height: 1; }
+#hv-pose, #hv-hide, #hv-pop { position: relative; z-index: 1; } /* above the mirrored video: its transform paints it over unpositioned siblings */
+#hv-hide, #hv-pop { grid-area: v; align-self: start; justify-self: end; display: grid; place-items: center; min-block-size: 0; min-inline-size: 0; width: 28px; height: 28px; margin: 4px; padding: 0; border: 0; border-radius: 50%; background: var(--on-stage); color: var(--stage); font-weight: 700; line-height: 1; }
+#hv-hide { font-size: 22px; }
+#hv-pop { margin-right: 36px; font-size: 15px; }
 #hv-hide:hover, #hv-pop:hover { background: #fff; }
-#hv-pop { position: absolute; top: 4px; left: 36px; display: grid; place-items: center; min-block-size: 0; min-inline-size: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--on-stage); color: var(--stage); font-size: 15px; font-weight: 700; line-height: 1; }
-/* Collapsed: one line (▴ · pose · status) so the page gets the space back. */
-#hv-view.mini { width: auto; max-width: calc(100% - 16px); aspect-ratio: auto; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 999px; }
-#hv-view.mini :is(video, canvas) { width: 1px; height: 1px; opacity: 0; } /* still on the page: the engine reads frames from the video */
-#hv-view.mini :is(#hv-hide, #hv-pop, #hv-status, #hv-pose) { position: static; }
+/* Collapsed: one 200px line (status dot · pose · ⧉ ▴) so the page gets the height back. */
+#hv-view.mini { grid-template-areas: "b p pop hide"; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; padding: 2px; border-radius: 999px; }
+#hv-view.mini :is(video, canvas) { position: absolute; width: 1px; height: 1px; opacity: 0; } /* still on the page: the engine reads frames from the video */
+#hv-view.mini #hv-status { font-size: 0; padding: 0 0 0 8px; } /* only the dot; the full text stays in the title */
+#hv-view.mini #hv-pose { grid-area: p; align-self: center; margin: 0; background: none; }
+#hv-view.mini #hv-pop { grid-area: pop; margin: 0 4px 0 0; width: 24px; height: 24px; }
+#hv-view.mini #hv-hide { grid-area: hide; margin: 0; width: 24px; height: 24px; font-size: 18px; }
 
 /* Orb: left end of the strip, drawn by orb.js. */
-#orb { order: -1; width: 150px; height: 150px; display: grid; place-items: center; pointer-events: none; }
+#orb { grid-area: orb; width: 150px; height: 150px; display: grid; place-items: center; pointer-events: none; }
 #orb canvas { width: 140px; height: 140px; }
 /* No 2D context: a dot in the state's colour. */
 .orb-dot { border-radius: 50%; transform: scale(0.4); background: rgb(120 128 140); }
@@ -128,8 +133,21 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 .orb-dot[data-state="thinking"] { background: rgb(212 160 40); }
 .orb-dot[data-state="listenOnly"] { background: rgb(150 138 205); }
 
-/* Bottom row: Start, Mic, Gallery, the status with its dot, HUD. */
-#run { flex: 1; min-width: 0; align-self: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; align-items: center; } /* in #corner, between orb and camera */
+/* Two fixed rows: buttons + HUD (Mic, Listen, Gallery are icons, the words are tooltips), then status left and context right.
+   The context meter and ↺ keep their place while hidden, so nothing shifts when a session starts. */
+#run { grid-area: run; min-width: 0; align-self: center; justify-self: center; display: grid; gap: 10px; }
+#run .acts { display: flex; align-items: center; gap: 8px; }
+#run .acts #hud-box { margin-left: 8px; }
+#run .icon { padding: 0; width: 36px; font-size: 16px; }
+#run .line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ctx-slot { display: inline-flex; align-items: center; gap: 8px; }
+#ctx[hidden] { display: inline-flex !important; visibility: hidden; }
+#ctx-clear[hidden] { display: inline-block !important; visibility: hidden; }
+#ctx-clear { min-block-size: 28px; padding: 0 8px; }
+/* Narrow window: the orb shrinks a little, then the camera takes its own row, so the buttons are never squeezed. */
+@media (max-width: 700px) { #orb { width: 120px; height: 120px; } #orb canvas { width: 116px; height: 116px; } }
+@media (max-width: 620px) { #corner { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "orb run" "cam cam"; } #hv-view { justify-self: end; } }
+
 #status { min-width: 0; color: var(--muted); }
 #status::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--line); }
 #status[data-state="connecting"]::before { background: var(--wait); }
@@ -154,7 +172,14 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 .chip[data-bad] { color: #c0563f; border-color: #c0563f; }
 .chip button { padding: 0 6px; min-height: 0; }
 #hud-box { display: flex; align-items: center; gap: 6px; color: var(--muted); }
-#hud-guide-link { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 12px; text-decoration: none; }
+#hud-box { white-space: nowrap; }
+/* ? at the right end of the header: the help menu for the whole app. */
+#tabs { margin-left: auto; }
+#help { min-inline-size: 0; width: 28px; min-block-size: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); font-size: 13px; }
+#help-menu { inset: 52px 16px auto auto; margin: 0; padding: 6px; display: none; flex-direction: column; border: 1px solid var(--hair); border-radius: 8px; background: var(--card); color: var(--text); }
+#help-menu:popover-open { display: flex; }
+#help-menu a { padding: 8px 10px; border-radius: 6px; text-decoration: none; }
+#help-menu a:hover { background: var(--card-2); }
 #error { margin: 0; padding: 8px 12px; border: 1px solid var(--bad); border-radius: 8px; background: var(--error-bg); overflow-wrap: anywhere; }
 
 dialog:modal { overscroll-behavior: contain; }
