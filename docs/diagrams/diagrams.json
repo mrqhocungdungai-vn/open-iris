@@ -15,5 +15,14 @@
     "owner": "po",
     "audience": [],
     "refines": "d_742up8#hooks"
+  },
+  {
+    "id": "d_253zi8",
+    "name": "open-iris: vòng lặp trái tim trong main.mjs",
+    "file": "open-iris-vong-lap-trai-tim-trong-main-mjs.excalidraw",
+    "kind": "flow",
+    "owner": "dev",
+    "audience": [],
+    "refines": "d_742up8#main"
   }
 ]
