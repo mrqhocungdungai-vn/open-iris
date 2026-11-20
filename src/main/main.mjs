@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
+import { pushLine } from "../gesture/talk.js";
 import { cleanTools, desktopTools } from "./desktop.mjs";
 import { keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 import { contextMeter } from "./context-meter.mjs";
@@ -79,8 +80,10 @@ let enabledTools = []; // registry entries switched on for this session
 // The window is already destroyed when window-all-closed calls stopLive().
 // The HUD (gesture/) shows status and transcript too; audio goes to the main window only.
 let liveStatus = "offline"; // last live:status, for a HUD opened mid-session
+const history = []; // recent live:log rows, memory only (gone on quit), for the HUD 💬 chat window opened mid-session
 const send = (channel, payload) => {
   if (channel === "live:status") liveStatus = payload;
+  if (channel === "live:log") pushLine(history, payload);
   for (const w of channel === "live:audio" ? [win] : BrowserWindow.getAllWindows()) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 };
 let muted = false; // HUD 🔇: mic chunks are dropped here, the session stays open
@@ -351,6 +354,7 @@ function stopLive() {
 // shortcut: SessionEnd/SessionStart do not fire, so a plugin sees one session; fire them here if a plugin needs the cut.
 let clearing = false;
 async function clearContext() {
+  history.length = 0; // ↺ starts a fresh conversation, so the chat window starts empty too
   if (!session || clearing) return;
   clearing = true;
   log("INFO", "live", "clear requested");
@@ -552,6 +556,7 @@ ipcMain.handle("live:input", (_e, parts, label) => {
 });
 // HUD buttons: Start/Stop goes through the main window so it uses that window's model/voice/tool picks.
 ipcMain.handle("live:state", () => ({ status: liveStatus, muted, listenOnly }));
+ipcMain.handle("live:history", () => history);
 ipcMain.on("iris:toggle", () => win && !win.isDestroyed() && win.webContents.send("iris:toggle"));
 ipcMain.on("iris:mute", (_e, on) => {
   log("INFO", "live", `mic ${on === true ? "muted" : "unmuted"}`);

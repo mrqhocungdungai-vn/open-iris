@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:;" />
+<title>Iris chat</title>
+<!-- The 💬 chat window in HUD mode (hud.mjs openChat): the conversation plus the same input box as the main window (compose-ui.js,
+     same ids). Clicked with the hand mouse, so every target is 44px. -->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; flex-direction: column; background: #181715; color: #faf9f5; font: 14px/1.45 Inter, system-ui, sans-serif; }
+  [hidden] { display: none !important; }
+  header { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; border-bottom: 1px solid #3a3733; -webkit-app-region: drag; }
+  header b { flex: 1; font-weight: 600; }
+  button { min-width: 44px; min-height: 44px; padding: 0 12px; border: 1px solid #6c6a64; border-radius: 10px; background: #252320; color: #faf9f5; font: inherit; font-weight: 500; white-space: nowrap; -webkit-app-region: no-drag; }
+  button:hover:not(:disabled) { border-color: #faf9f5; }
+  button:disabled { opacity: 0.4; }
+  #close { border-radius: 50%; padding: 0; }
+  #talk { flex: 1; overflow-y: auto; padding: 10px 12px; }
+  #talk > div + div { margin-top: 6px; }
+  #talk .you { color: #6cc4ff; }
+  #talk .sys { font-size: 11px; color: #a09d96; }
+  #talk .sys + .sys { margin-top: 0; }
+  #talk:empty::before { content: attr(data-empty); color: #a09d96; }
+  #error { margin: 0 12px; color: #e8836b; font-size: 12px; }
+  #compose { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid #3a3733; }
+  #compose .line { display: flex; gap: 8px; align-items: flex-end; }
+  #compose[data-drop] textarea { outline: 2px dashed #2f7fd0; }
+  textarea { flex: 1; min-height: 44px; max-height: 120px; box-sizing: border-box; padding: 11px 12px; border: 1px solid #6c6a64; border-radius: 10px; background: #252320; color: #faf9f5; font: inherit; resize: none; }
+  #say-send { background: #1f6fbf; border-color: transparent; } /* blue, darkened so the label keeps 4.5:1 */
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  #chips:empty { display: none; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 8px; border-radius: 8px; background: #2f2c28; font-size: 12px; }
+  .chip img { width: 36px; height: 28px; object-fit: cover; border-radius: 4px; }
+  .chip[data-bad] { color: #e8836b; }
+  .chip button { min-width: 32px; min-height: 32px; padding: 0; border-radius: 50%; }
+</style>
+<header><b>Iris</b><button id="close" title="Ẩn (Esc)" data-en-title="Hide (Esc)" aria-label="Ẩn" data-en-aria-label="Hide">✕</button></header>
+<div id="talk" data-empty="Chưa có hội thoại" data-en-empty="No conversation yet"></div>
+<p id="error" hidden></p>
+<form id="compose">
+  <div id="chips"></div>
+  <div class="line"><button type="button" id="attach" title="Chọn ảnh hoặc tệp chữ (hoặc kéo thả vào đây)" data-en-title="Pick an image or a text file (or drop it here)" aria-label="Đính kèm" data-en-aria-label="Attach">📎</button><button type="button" id="paste" title="Dán ảnh đang có trong clipboard" data-en-title="Paste the image on the clipboard" aria-label="Dán ảnh" data-en-aria-label="Paste image">📋</button><input id="attach-in" type="file" multiple hidden /><textarea id="say" rows="1" aria-label="Gõ cho Iris" data-en-aria-label="Type to Iris"></textarea><button id="say-send" data-en="Send">Gửi</button></div>
+</form>
+<script type="module" src="chat.js"></script>

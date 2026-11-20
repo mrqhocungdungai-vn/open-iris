@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld("iris", {
   onInterrupt: on("live:interrupt"),
   onStatus: on("live:status"),
   onLog: on("live:log"),
+  getHistory: () => ipcRenderer.invoke("live:history"), // recent live:log rows kept in main memory (chat window)
   onContext: on("live:context"), // { used, max, trimAt } once per turn, null after "↺ Làm mới"
   sendInput: (parts, label) => ipcRenderer.invoke("live:input", parts, label), // typed turn → true if sent
   clearContext: () => ipcRenderer.send("live:clear"), // "↺ Làm mới": a new session, same setup, mic and 👂 kept
@@ -78,4 +79,6 @@ contextBridge.exposeInMainWorld("gesture", {
   interactive: (on) => ipcRenderer.send("hud:interactive", on), // HUD stops being click-through over its buttons
   popout: () => ipcRenderer.send("popout"), // HUD 📷 and main window ⧉: open / close the "Iris Camera" window (hud.mjs openPop)
   onPopout: on("popout"),
+  chat: (dock) => ipcRenderer.send("chat", dock), // HUD 💬: show / hide the chat window next to the dock rect { x, y, width, height }
+  onChat: on("chat"),
 });

@@ -11,6 +11,7 @@ import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { cleanDevice } from "../renderer/devices.js";
+import { chatPlace } from "./talk.js";
 
 // main.mjs owns the log and the data folder (~/.open-iris); it calls initGesture() once at startup.
 let log = () => {};
@@ -200,8 +201,9 @@ function setDock(on) {
   log("INFO", "app", on ? "HUD on" : "HUD off");
   broadcast("hud", on);
   // HUD is a mode: it replaces the main window (engine and voice keep running hidden); ✕ Thoát HUD or ⌃⌥H brings it back.
-  for (const w of BrowserWindow.getAllWindows()) if (w !== win && w !== pop) on ? w.hide() : w.show(); // the pop-out stays as the user left it
+  for (const w of BrowserWindow.getAllWindows()) if (w !== win && w !== pop && w !== chat) on ? w.hide() : w.show(); // the pop-out stays as the user left it
   syncOverlay();
+  on ? chat || openChat() : chat?.close();
   // The main window is hidden in HUD mode, so the menu bar icon is the way back.
   if (on && !tray) {
     tray = new Tray(path.join(dir, "..", "..", "assets", "trayTemplate.png")); // Template: macOS tints it for light and dark menu bars
@@ -238,6 +240,34 @@ ipcMain.on("popout", () => (pop ? pop.close() : openPop()));
 export function closePop() {
   pop?.close();
 }
+// 💬 chat window: type, paste or attach images to Iris while in the HUD (the overlay itself never takes the keyboard).
+// Made hidden with the HUD, so it already holds the conversation and opens at once; 💬, ✕ or Esc hides it again.
+// type "panel" + focusable: it takes the keyboard without bringing Iris forward, so hiding it leaves you in your app.
+let chat = null;
+const CHAT_W = 440, CHAT_H = 420;
+function openChat() {
+  chat = new BrowserWindow({
+    show: false, width: CHAT_W, height: CHAT_H, type: "panel", frame: false, resizable: false, skipTaskbar: true, backgroundColor: "#181715",
+    webPreferences: { preload: path.join(dir, "..", "preload", "preload.cjs") },
+  });
+  chat.setAlwaysOnTop(true, "screen-saver", 1); // one step above the overlay
+  chat.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+  pipeLogs(chat.webContents);
+  chat.on("hide", () => broadcast("chat", false));
+  chat.on("closed", () => { chat = null; broadcast("chat", false); });
+  chat.loadFile(path.join(dir, "chat.html"));
+}
+ipcMain.on("chat", (_e, d) => {
+  if (!chat) return;
+  if (chat.isVisible()) return chat.hide();
+  const { bounds, workArea } = screen.getPrimaryDisplay(); // the overlay covers bounds, so its CSS px + bounds origin = screen px
+  if ([d?.x, d?.y, d?.width, d?.height].every(Number.isFinite)) chat.setBounds(chatPlace({ ...d, x: bounds.x + d.x, y: bounds.y + d.y }, workArea, CHAT_W, CHAT_H));
+  chat.show();
+  chat.focus();
+  log("INFO", "app", "chat open");
+  broadcast("chat", true);
+});
+
 // main.mjs: the footer 🖼 Gallery button, a dropped folder or the HUD 🖼 button. null closes it.
 export function setGallery(g) {
   gallery = g;

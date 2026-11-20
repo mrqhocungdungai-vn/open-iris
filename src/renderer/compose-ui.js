@@ -1,5 +1,6 @@
 // Manual input box (#compose) under the conversation: typed text, images and text files go to Iris as one turn.
 // Its own switch (#compose-on); drops on the box attach, drops elsewhere still open the Gallery (gesture/setup.js).
+// The HUD 💬 chat window (gesture/chat.html) loads this file too, with the same ids plus 📋 #paste and without the switch.
 import { classify, buildParts } from "./compose-view.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -28,7 +29,7 @@ async function add(files) {
 function render() {
   const live = status !== "offline" && status !== "connecting";
   $("compose").hidden = !on;
-  for (const id of ["attach", "say", "say-send"]) $(id).disabled = !live || sending;
+  for (const id of ["attach", "paste", "say", "say-send"]) if ($(id)) $(id).disabled = !live || sending;
   $("say").placeholder = live ? tr("Gõ cho Iris… (Enter gửi, Shift+Enter xuống dòng)", "Type to Iris… (Enter sends, Shift+Enter new line)") : tr("Bấm Bắt đầu để gõ cho Iris", "Press Start to type to Iris");
   $("chips").replaceChildren(...items.map((it, i) => {
     const chip = document.createElement("span");
@@ -61,6 +62,18 @@ $("compose").onsubmit = (e) => { e.preventDefault(); sendNow(); };
 $("say").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendNow(); } }; // isComposing: Vietnamese IME
 $("attach").onclick = () => $("attach-in").click();
 $("attach-in").onchange = () => { add([...$("attach-in").files]); $("attach-in").value = ""; };
+// ⌘V of a copied image or file attaches it; plain text pastes as usual.
+$("say").onpaste = (e) => { const files = [...e.clipboardData.files]; if (files.length) { e.preventDefault(); add(files); } };
+// 📋 (chat window only): the clipboard image without a keyboard, for the hand mouse.
+if ($("paste")) $("paste").onclick = async () => {
+  const files = [];
+  try {
+    for (const it of await navigator.clipboard.read())
+      for (const t of it.types) if (t.startsWith("image/")) files.push(new File([await it.getType(t)], `clipboard.${t.split("/")[1]}`, { type: t }));
+  } catch (e) { console.warn("clipboard read failed:", e.message); }
+  if (files.length) add(files);
+  else { $("error").textContent = tr("Clipboard không có ảnh.", "No image on the clipboard."); $("error").hidden = false; }
+};
 // stopPropagation keeps the document-level Gallery drop from also firing.
 $("compose").ondragover = (e) => { e.preventDefault(); e.stopPropagation(); $("compose").dataset.drop = ""; };
 $("compose").ondragleave = () => delete $("compose").dataset.drop;
@@ -71,7 +84,8 @@ $("compose").ondrop = (e) => {
 };
 
 window.iris.onStatus((s) => ((status = s), render()));
-window.iris.getConfig().then((c) => ((on = c.compose), ($("compose-on").checked = on), render()));
-$("compose-on").onchange = () => { on = $("compose-on").checked; window.iris.saveCompose(on); render(); };
+window.iris.getState().then((s) => ((status = s.status), render())); // the chat window opens mid-session
+window.iris.getConfig().then((c) => { on = c.compose; if ($("compose-on")) $("compose-on").checked = on; render(); });
+if ($("compose-on")) $("compose-on").onchange = () => { on = $("compose-on").checked; window.iris.saveCompose(on); render(); };
 document.addEventListener("langchange", render);
 render();

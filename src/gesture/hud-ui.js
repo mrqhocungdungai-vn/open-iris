@@ -2,6 +2,7 @@
 // except while the cursor is over the dock or the gallery is open (see hud:interactive in hud.mjs).
 import { RING_SLOTS, ringFront, ringTo, ringTurn, palmGap, zoomTarget } from "./hand.js";
 import { mountOrb } from "../renderer/orb.js";
+import { addLine } from "./talk.js";
 
 const $ =(id) => document.getElementById(id);
 // UI language = the main window's Ngôn ngữ select (config lang), read each time the HUD opens; it cannot change while the HUD is up.
@@ -69,34 +70,15 @@ window.gesture.onPopout((on) => $("b-cam").classList.toggle("on", on));
 $("b-cam").onclick = () => window.gesture.popout();
 $("b-exit").onclick = () => window.gesture.hud(false); // back to the main window (hud.mjs setDock shows it)
 
-// Transcript: the same lines as the main window's log.
+// Transcript: one line of the newest turn. 💬 or a click on the line opens the chat window (hud.mjs openChat) for the whole
+// conversation, typing and images.
 const talk = $("talk");
-$("b-talk").onclick = () => {
-  talk.classList.toggle("big");
-  talk.scrollTop = talk.scrollHeight;
+window.iris.onLog((line) => addLine(talk, line));
+$("b-talk").onclick = talk.onclick = () => {
+  const { x, y, width, height } = $("dock").getBoundingClientRect();
+  window.gesture.chat({ x, y, width, height });
 };
-talk.onclick = () => talk.classList.contains("big") || $("b-talk").onclick(); // the one line opens it; 💬 closes it
-// Gemini speaks in chunks, one log line each; glue a chunk onto the row of the same speaker so a reply reads as one sentence.
-window.iris.onLog((line) => {
-  const who = /^(you|iris):/.exec(line)?.[0];
-  const last = talk.lastElementChild;
-  if (who && last?.dataset.who === who) {
-    last.textContent += line.slice(who.length + 1); // chunks carry their own spaces
-    talk.scrollTop = talk.scrollHeight;
-    return;
-  }
-  const row = document.createElement("div");
-  row.className = who === "you:" ? "you" : who === "iris:" ? "iris" : "sys";
-  if (who) {
-    row.dataset.who = who;
-    talk.querySelector(".now")?.classList.remove("now");
-    row.classList.add("now"); // the one line shown while the conversation is small
-  }
-  row.textContent = line;
-  talk.append(row);
-  while (talk.childElementCount > 200) talk.firstChild.remove();
-  talk.scrollTop = talk.scrollHeight;
-});
+window.gesture.onChat((open) => $("b-talk").classList.toggle("on", open));
 
 // Gallery View: every folder entry is a card. ✌ scroll turns the ring one card per WHEEL_STEP, click brings a card to the front,
 // double-click opens it like Finder: image = viewer, folder/⬆ = go there, other file = its macOS app (main).
