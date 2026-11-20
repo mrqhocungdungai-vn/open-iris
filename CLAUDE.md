@@ -2,6 +2,16 @@
 
 Electron app for macOS. Gemini Live handles voice, agent-desktop controls the desktop, and MediaPipe tracks the hand. README.md explains what each part does.
 
+## Philosophy
+- Keep the core simple. open-iris is a core harness that makes plugins easy to build, not an app that fits one person's needs.
+- The core has four parts and nothing else:
+  1. Voice with Gemini Live.
+  2. agent-desktop to control the computer.
+  3. Hand Task Vision to control the mouse.
+  4. Gallery View, which builds on the hand and on voice with agent-desktop.
+- A personal need becomes a plugin, never core code. Examples: Livestream, orca.
+- When a feature request comes in, ask first: does every user want this, and is it one of the four parts? If not, the core only gets the generic hook or API the plugin needs. That hook or API never names the plugin.
+
 ## Commands
 - `pnpm test` runs the tests. Run it after every change.
 - `pnpm dev` runs the app. Read the logs in `~/.open-iris/logs/main.log`.
