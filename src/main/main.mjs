@@ -10,7 +10,7 @@ import { pathToFileURL } from "node:url";
 import { cleanDevice } from "../renderer/devices.js";
 import { cleanTools, desktopTools } from "./desktop.mjs";
 import { keyFormatOk, liveSetup } from "./live-config.mjs";
-import { cleanTopic, cohostBrief, createRecap, LISTEN_OFF_EVENT, LISTEN_ON_EVENT, RECAP_EVENT, refuseCalls } from "./livestream.mjs";
+import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
 import { closeHud, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
 
@@ -37,7 +37,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), cohost: c?.cohost === true, recap: c?.recap !== false, topic: cleanTopic(c?.topic), welcomed: c?.welcomed === true });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), welcomed: c?.welcomed === true });
 const writeConfig = (c) => fs.writeFileSync(configFile, JSON.stringify(clean(c), null, 2) + "\n");
 function readConfig() {
   try { return clean(JSON.parse(fs.readFileSync(configFile, "utf8"))); } catch { return clean(); }
@@ -71,17 +71,8 @@ const send = (channel, payload) => {
   for (const w of channel === "live:audio" ? [win] : BrowserWindow.getAllWindows()) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 };
 let muted = false; // HUD 🔇: mic chunks are dropped here, the session stays open
-// Livestream (Features tab): listen-only drops Iris's audio and transcript and refuses tools, the mic still goes in.
-let listenOnly = false;
-let recapOn = false; // co-host and recap switches as they were at connect
-const recap = createRecap({
-  send: () => {
-    if (!recapOn || listenOnly || !session) return false; // retried next second, see createRecap
-    session.sendRealtimeInput({ text: RECAP_EVENT });
-    log("INFO", "live", "recap sent");
-    return true;
-  },
-});
+let listenOnly = false; // 👂: Iris's audio and transcript are dropped and tools refused, the mic still goes in
+let announcing = null; // timer while Iris says "listen mode is on": its output passes the listen-only gate until then
 
 // A second live:start while one is still connecting is a no-op.
 let starting = false;
@@ -107,10 +98,8 @@ async function connectLive(opts) {
   // IRIS.md and skills are read here, once: edits apply from the next Start, like the tool switches.
   const skills = loadSkills(home, (m) => log("WARN", "skills", m)).filter((s) => skillOn[s.name] !== false);
   enabledTools = desktopTools().filter((t) => tools[t.name]).concat(skillTools(skills));
-  // Livestream co-host, read from config like IRIS.md: switch and topic apply from the next Start. Owner notes stay last.
-  recapOn = saved.cohost && saved.recap;
-  const brief = (saved.cohost ? cohostBrief(saved.topic, recapOn) : "") + personaBrief(loadOwner(home), skills);
-  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} cohost=${saved.cohost} recap=${recapOn}`);
+  const brief = personaBrief(loadOwner(home), skills);
+  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"}`);
   chunksIn = 0;
   chunksOut = 0;
   send("live:status", "connecting");
@@ -129,7 +118,6 @@ async function connectLive(opts) {
       onopen: () => {
         log("INFO", "live", "connected");
         send("live:status", "listening");
-        recap.start();
       },
       onmessage: handleMessage,
       onerror: (e) => {
@@ -141,7 +129,6 @@ async function connectLive(opts) {
         log("INFO", "live", `closed code=${e?.code} reason=${e?.reason || "(none)"} micChunksSent=${chunksIn}`);
         if (session !== me) return;
         session = null;
-        recap.stop();
         setListenOnly(false);
         send("live:log", `closed: ${e?.code} ${e?.reason || ""}`);
         send("live:status", "offline");
@@ -164,15 +151,14 @@ function handleMessage(message) {
   if (content.inputTranscription?.text) {
     log("DEBUG", "transcript", `you: ${content.inputTranscription.text}`);
     send("live:log", `you: ${content.inputTranscription.text}`);
-    recap.markActivity();
   }
-  if (listenOnly) {
+  if (announcing && content.turnComplete) endAnnounce();
+  else if (listenOnly && !announcing) {
     // Only the user's words show; Iris's audio and transcript are dropped.
     if (content.turnComplete || content.interrupted) send("live:status", "listening");
     return;
   }
   if (content.outputTranscription?.text) {
-    recap.markActivity();
     log("DEBUG", "transcript", `iris: ${content.outputTranscription.text}`);
     send("live:log", `iris: ${content.outputTranscription.text}`);
   }
@@ -232,7 +218,6 @@ function stopLive() {
   if (session) log("INFO", "live", "stop requested");
   const s = session;
   session = null;
-  recap.stop();
   try { s?.close(); } catch { /* ignore close races */ }
   send("live:interrupt");
   send("live:status", "offline");
@@ -243,16 +228,27 @@ function setMuted(on) {
   muted = on;
   send("live:mute", on);
 }
-// The notice tells Gemini why it gets no turn; the gate above enforces it. Turning on cuts what Iris was saying.
+// The notice is a full turn, so Iris says the new state aloud from any switch (👂 button, HUD, 👍 hold); the gate above
+// enforces the silence after that. Turning on cuts what Iris was saying, then lets the one announcing turn through.
+// shortcut: the grace ends at the next turnComplete or after 8s, so a reply already in flight can slip out before the
+// announcement; track the announcing turn itself if users hear that.
 function setListenOnly(on) {
   if (listenOnly === on) return;
   listenOnly = on;
   log("INFO", "live", `listen-only ${on ? "on" : "off"}`);
+  endAnnounce();
   if (session) {
-    try { session.sendRealtimeInput({ text: on ? LISTEN_ON_EVENT : LISTEN_OFF_EVENT }); } catch (e) { log("ERROR", "live", `listen notice: ${e?.message || e}`); }
-    if (on) send("live:interrupt");
+    if (on) {
+      send("live:interrupt");
+      announcing = setTimeout(endAnnounce, 8000);
+    }
+    try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: on ? LISTEN_ON_EVENT : LISTEN_OFF_EVENT }] }], turnComplete: true }); } catch (e) { log("ERROR", "live", `listen notice: ${e?.message || e}`); }
   }
   send("live:listen", on);
+}
+function endAnnounce() {
+  clearTimeout(announcing);
+  announcing = null;
 }
 
 ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, owner: loadOwner(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })) } }));
@@ -283,12 +279,6 @@ ipcMain.handle("key:save", async (_e, key) => {
   process.env.GEMINI_API_KEY = key;
   log("INFO", "app", `GEMINI_API_KEY saved to ${envFile}`);
   return "";
-});
-// Features › Livestream: { cohost, recap, topic }, any subset; clean() checks each one.
-ipcMain.handle("config:live", (_e, patch) => {
-  const { cohost, recap, topic } = patch || {};
-  writeConfig({ ...readConfig(), ...(cohost !== undefined && { cohost }), ...(recap !== undefined && { recap }), ...(topic !== undefined && { topic }) });
-  log("INFO", "live", `livestream settings ${JSON.stringify({ cohost, recap, topic })}`);
 });
 ipcMain.handle("live:start", (_e, opts) => startLive(opts));
 ipcMain.handle("live:stop", () => stopLive());

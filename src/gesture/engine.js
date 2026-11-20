@@ -2,7 +2,7 @@
 // HUD closed. Camera + MediaPipe HandLandmarker → mouse events (hud.mjs → Swift helper). Each frame's state is also sent
 // to the HUD overlay (if open) for its cursor ring, pose line and camera skeleton.
 import { DrawingUtils, FilesetResolver, HandLandmarker } from "../../node_modules/@mediapipe/tasks-vision/vision_bundle.mjs";
-import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isOpen, LOCK_HOLD_MS, pinchApproach, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
+import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isThumbUp, isOpen, LOCK_HOLD_MS, pinchApproach, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
 import { deviceConstraint } from "../renderer/devices.js";
 
 const $ = (id) => document.getElementById(id);
@@ -22,7 +22,7 @@ let scrollAt = null; // knuckle (mirrored) on the previous scroll frame
 let scrollVel = { x: 0, y: 0 }; // averaged scroll px per frame while in the V pose
 let glideV = null; // inertia after the V pose ends, see glide()
 let anchor = null; // click lock point, see clickLock()
-let lockSince = null; // when the current 🤘 started; Infinity once it has toggled, until the pose ends
+let lockSince = null; // when the current 🤘 or 👍 hold started; Infinity once it has toggled, until the pose ends
 let span = 0.6; // hand area that covers the screen, set from the main window
 let mode = "trackpad"; // or "absolute"
 let side = "right"; // hand that drives the mouse
@@ -53,6 +53,13 @@ window.gesture.onControl((on) => {
   showStatus();
 });
 document.addEventListener("langchange", showStatus);
+
+// 👍 hold toggles listen-only. It works only while Iris runs (main ignores iris:listen otherwise), so track both.
+let listening = false;
+let irisOn = false;
+window.iris.onListen((on) => (listening = on));
+window.iris.onStatus((st) => (irisOn = st !== "offline"));
+window.iris.getState().then((st) => { listening = st.listenOnly; irisOn = st.status !== "offline"; });
 
 let landmarker = null; // loaded on first start, kept for the next
 let timer = 0;
@@ -145,7 +152,7 @@ function frame() {
   // Both palms (mirrored like the screen), for the HUD gallery's two-hand zoom; null unless both hands are open ✋.
   palms = res.landmarks.length === 2 && res.landmarks.every(isOpen) ? res.landmarks.map((l) => ({ x: 1 - l[9].x, y: l[9].y })) : null;
   // Here, not in the branches: every way out of the V pose (other pose, hand gone) starts the glide.
-  const raw = !lm ? null : isFist(lm) ? "fist" : isRock(lm) ? "rock" : isScrollPose(lm) ? "scroll" : "move";
+  const raw = !lm ? null : isThumbUp(lm) ? "thumb" : isFist(lm) ? "fist" : isRock(lm) ? "rock" : isScrollPose(lm) ? "scroll" : "move";
   poseState = raw && settle(poseState, raw);
   const scrolling = poseState?.pose === "scroll";
   if (!scrolling && scrollAt) {
@@ -194,6 +201,28 @@ function frame() {
       lockSince = Infinity; // one toggle per pose; change pose to arm again
     }
     return showPose(lm, lockSince === Infinity ? tr("🤘 đã đổi · thả tư thế ra", "🤘 switched · release the pose") : `🤘 ${tr("giữ", "hold")} ${Math.round(progress * 100)}% → ${control ? tr("tạm dừng", "pause") : tr("tiếp tục", "resume")}`, "lock", lockSince === Infinity ? 0 : progress);
+  }
+  if (poseState.pose === "thumb") {
+    release();
+    hand = null;
+    cursor ??= cursorFrom(lm, span);
+    if (!irisOn) {
+      lockSince = null;
+      return showPose(lm, tr("👍 chỉ nghe · Iris chưa chạy", "👍 listen only · Iris is not running"), "fist");
+    }
+    // Hold to turn listen-only on; while it is on, a new 👍 turns it off at once. One toggle per pose.
+    if (listening && lockSince === null) {
+      window.iris.listen(false);
+      lockSince = Infinity;
+    }
+    const now = performance.now();
+    lockSince ??= now;
+    const progress = Math.min(1, (now - lockSince) / LOCK_HOLD_MS);
+    if (progress === 1) {
+      window.iris.listen(true);
+      lockSince = Infinity;
+    }
+    return showPose(lm, lockSince === Infinity ? tr("👍 đã đổi · thả tư thế ra", "👍 switched · release the pose") : `👍 ${tr("giữ", "hold")} ${Math.round(progress * 100)}% → ${tr("chỉ nghe", "listen only")}`, "lock", lockSince === Infinity ? 0 : progress);
   }
   lockSince = null;
 

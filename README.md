@@ -2,7 +2,7 @@
 
 A macOS voice assistant that controls your computer. You talk to Iris, which runs on Gemini Live, and it:
 
-- talks with you in the persona you pick, with skills you can add, and can co-host a livestream with short answers, a spoken recap and a listen-only mode;
+- talks with you in the persona you pick, with skills you can add, and has a listen-only mode (👂 button, or hold 👍 to turn it on and show 👍 again to turn it off) where it keeps hearing for context but does not speak or act, and says aloud when the mode changes;
 - opens apps, clicks, reads and types in them, using [agent-desktop](https://github.com/vercel-labs/agent-desktop) through the macOS accessibility API;
 - moves the mouse with hand gestures from your camera, using MediaPipe, with a small floating HUD and a Gallery View.
 

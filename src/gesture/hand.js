@@ -74,6 +74,10 @@ export const isFist = (lm) => [[8, 6], [12, 10], [16, 14], [20, 18]].every(([tip
 export const LOCK_HOLD_MS = 1500;
 export const isRock = (lm) => extended(lm, 8, 6) && !extended(lm, 12, 10) && !extended(lm, 16, 14) && extended(lm, 20, 18);
 
+// Thumbs up 👍 (four fingers folded, thumb tip well above the index knuckle), held LOCK_HOLD_MS, toggles listen-only.
+// Checked before isFist, which ignores the thumb. A normal fist tucks the thumb below the knuckle, so it never counts.
+export const isThumbUp = (lm) => isFist(lm) && dist(lm[4], lm[0]) > dist(lm[3], lm[0]) && (lm[5].y - lm[4].y) / dist(lm[0], lm[9]) > 0.35;
+
 // Click lock: while pinched, and for `hold` ms after letting go, the cursor stays on the click point unless the hand
 // moves past `radius` (screen fraction). Hand jitter otherwise turns a click into a drag and breaks double-clicks.
 export const CLICK_HOLD_MS = 500; // macOS default double-click interval

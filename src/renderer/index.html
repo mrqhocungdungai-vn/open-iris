@@ -50,14 +50,6 @@
   <h2 lang="en">Gallery View</h2>
   <label class="feature"><input id="gallery-on" type="checkbox" role="switch" checked /> <span><span data-en="Browse folders and images by hand">Xem thư mục, ảnh bằng tay</span> <small data-en="open it with the Gallery button below; dropping a folder or image on the window opens it too">mở bằng nút Gallery ở dưới; kéo thư mục hoặc ảnh vào cửa sổ cũng mở</small></span></label>
   <p class="more"><a id="gallery-guide-link" href="../gesture/gallery-guide.html" target="_blank" data-en="Gallery View guide">Hướng dẫn Gallery View</a></p>
-  <!-- Livestream (main.mjs, livestream.mjs): co-host prompt + topic and the spoken recap, read at connect. Listen-only is the 👂 button next to Mic. -->
-  <h2 lang="en">Livestream</h2>
-  <label class="feature"><input id="cohost" type="checkbox" role="switch" /> <span><span data-en="Livestream co-host">Đồng dẫn livestream</span> <small data-en="short 1–3 sentence answers so the stream keeps moving; takes effect at the next Start">trả lời ngắn 1–3 câu cho live chạy liền mạch; có hiệu lực từ lần Bắt đầu kế tiếp</small></span></label>
-  <div id="live-box" hidden>
-    <div class="topic"><input id="live-topic" type="text" maxlength="200" aria-label="Chủ đề buổi live" data-en-aria-label="Livestream topic" placeholder="Chủ đề buổi live, ví dụ: Dựng app Electron với Gemini Live" data-en-placeholder="Livestream topic, e.g. Building an Electron app with Gemini Live" /> <button id="topic-save" data-en="Save">Lưu</button></div>
-    <small id="topic-state" role="status"></small>
-    <label class="feature"><input id="recap" type="checkbox" role="switch" /> <span><span data-en="Recap every 5 minutes">Tóm tắt mỗi 5 phút</span> <small data-en="after 4 seconds of quiet, Iris recaps what was said, restates the topic for new viewers and asks them to engage">chờ lúc 4 giây không ai nói, Iris nói lại nội dung vừa rồi, nhắc chủ đề cho người mới vào và mời tương tác</small></span></label>
-  </div>
   <!-- macOS permissions for the whole app: Hand Task Vision (Accessibility, Camera) and voice (Microphone). -->
   <h2 data-en="macOS permissions">Quyền macOS</h2>
   <fieldset id="perms">

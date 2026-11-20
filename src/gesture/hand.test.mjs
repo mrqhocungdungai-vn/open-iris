@@ -128,6 +128,21 @@ test("rock 🤘 is index + pinky up only; fist, V and open hand are not", async 
   assert.equal(isRock(lm), false);
 });
 
+test("thumbs up 👍 is a fist with the thumb pointing up; a tucked thumb or open hand is not", async () => {
+  const { isThumbUp, isFist } = await import("./hand.js");
+  const lm = hand({ knuckle: { x: 0.5, y: 0.6 } });
+  for (const [tip, pip] of [[8, 6], [12, 10], [16, 14], [20, 18]]) { lm[pip] = { x: 0.5, y: 0.6 }; lm[tip] = { x: 0.5, y: 0.7 }; }
+  lm[3] = { x: 0.5, y: 0.5 };
+  lm[4] = { x: 0.5, y: 0.4 }; // thumb up, 1 hand size above the knuckle
+  assert.equal(isThumbUp(lm), true);
+  assert.equal(isFist(lm), true); // why the engine checks 👍 first
+  lm[4] = { x: 0.55, y: 0.62 }; // thumb tucked over the fingers = plain fist
+  assert.equal(isThumbUp(lm), false);
+  lm[4] = { x: 0.5, y: 0.4 };
+  lm[8] = { x: 0.5, y: 0.3 }; // index up: not folded
+  assert.equal(isThumbUp(lm), false);
+});
+
 test("glide slows down and stops within ~2s", () => {
   let v = { x: 0, y: 100 };
   let frames = 0;

@@ -148,7 +148,6 @@ $("lang").onchange = () => (setLang($("lang").value), window.iris.saveLang($("la
 document.addEventListener("langchange", () => {
   document.querySelectorAll("#tools strong").forEach((h) => (h.textContent = groupName()));
   $("owner-state").textContent = "";
-  $("topic-state").textContent = "";
   showListen();
   for (const id of ["guide-link", "hud-guide-link", "gallery-guide-link"]) $(id).search = "?lang=" + document.documentElement.lang;
   showStatus();
@@ -168,26 +167,6 @@ $("skills-open").onclick = async () => {
   const err = await window.iris.openSkills();
   if (err) showError("open skills", new Error(err));
 };
-// Features › Livestream: saved right away, read by main.mjs at the next Start.
-const liveIds = ["cohost", "recap", "live-topic", "topic-save"];
-const showLive = () => ($("live-box").hidden = !$("cohost").checked);
-config.then((c) => {
-  $("cohost").checked = c.cohost;
-  $("recap").checked = c.recap;
-  $("live-topic").value = c.topic;
-  showLive();
-});
-$("cohost").onchange = () => (window.iris.saveLive({ cohost: $("cohost").checked }), showLive());
-$("recap").onchange = () => window.iris.saveLive({ recap: $("recap").checked });
-$("topic-save").onclick = async () => {
-  try {
-    await window.iris.saveLive({ topic: $("live-topic").value });
-    $("topic-state").textContent = tr("Đã lưu. Có hiệu lực từ lần Bắt đầu kế tiếp.", "Saved. Takes effect at the next Start.");
-  } catch (e) {
-    showError("save topic", e);
-  }
-};
-$("live-topic").oninput = () => ($("topic-state").textContent = "");
 $("t-talk").onchange = () => ($("log").scrollTop = $("log").scrollHeight); // a hidden tab ignores scrollTop, so catch up on return
 
 const toolBoxes = () => [...document.querySelectorAll("#tools input")];

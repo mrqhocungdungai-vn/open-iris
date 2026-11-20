@@ -75,11 +75,6 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 [role=switch]:checked::after { transform: translateX(16px); }
 [role=switch]:disabled { background: var(--hair); cursor: not-allowed; }
 :is(#tools label, .feature):has(:disabled) { color: var(--muted); }
-/* Features › Livestream: topic and recap, indented under the co-host switch. */
-#live-box { padding: 8px 0 0 44px; }
-.topic { display: flex; gap: 8px; align-items: center; padding-bottom: 4px; }
-#live-topic { flex: 1; min-width: 0; min-block-size: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
-#live-topic:disabled { border-color: var(--hair); background: var(--hair); color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { [role=switch], [role=switch]::after { transition: none; } }
 
 /* ⚙ Quyền macOS (rows built by gesture/setup.js): name, state, button; what it is for on the next line. */

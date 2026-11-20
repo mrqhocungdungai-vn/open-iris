@@ -7,7 +7,7 @@
 `main` là bản public. Ai có máy Mac và Gemini key cũng chạy được, không cần Orca hay Claude Code.
 
 Bản public giữ lại ba phần:
-- **Gemini voice**: Gemini Live, persona, skills, livestream (đồng dẫn, tóm tắt, chỉ nghe).
+- **Gemini voice**: Gemini Live, persona, skills, chế độ chỉ nghe (👂). Livestream đã bỏ khỏi bản public (R1 trong `plugin-pack-plan.md`).
 - **Hand Task Vision**: điều khiển chuột bằng tay, HUD, Gallery View.
 - **agent-desktop**: điều khiển ứng dụng qua accessibility.
 
@@ -31,7 +31,7 @@ Bản đầy đủ có Orca nằm ở nhánh `open-iris-mrq` (worktree `~/orca/w
 | `src/renderer/welcome.js` | Bỏ dòng kiểm tra Orca CLI và Claude Code, bỏ năng lực "🤖 Giao việc cho Claude Code" và bước hướng dẫn của nó. |
 | `src/renderer/style.css` | Bỏ rule chỉ dùng cho các phần tử vừa xoá. |
 | `eval/tool-choice.mjs` | Bỏ 6 câu `expect: [*_coding_*]`. Thêm câu "đọc màn hình terminal" → không gọi tool nào. |
-| `README.md` | Bỏ gạch đầu dòng Claude Code/Orca và câu về Orca ở phần privacy. Thêm phần livestream nếu chưa có. |
+| `README.md` | Bỏ gạch đầu dòng Claude Code/Orca và câu về Orca ở phần privacy. |
 | `CLAUDE.md` | Câu đầu và `tools.mjs` trong Layout. Bỏ luật "never send a terminal screen, Orca screen". |
 | `.claude/`, `.agents/` | Xem câu hỏi 3. |
 

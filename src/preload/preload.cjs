@@ -4,7 +4,6 @@ const on = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payl
 
 contextBridge.exposeInMainWorld("iris", {
   getConfig: () => ipcRenderer.invoke("config:get"),
-  saveLive: (patch) => ipcRenderer.invoke("config:live", patch), // Features › Livestream: { cohost, recap, topic }
   saveKey: (key) => ipcRenderer.invoke("key:save", key), // checked against Gemini first; "" or an error text
   saveWelcomed: () => ipcRenderer.invoke("config:welcomed"),
   saveLang: (lang) => ipcRenderer.invoke("config:lang", lang),
