@@ -1,0 +1,75 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font: 12px Inter, system-ui, sans-serif; }
+/* Cursor reticle: no backing plate, a dark outline keeps it visible on any background. */
+#ring { z-index: 3; pointer-events: none; position: fixed; width: 28px; height: 28px; margin: -14px; box-sizing: border-box; border-radius: 50%; border: 3px solid #0c0; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000; }
+[hidden] { display: none !important; }
+#ring.down { background: rgba(255, 0, 0, 0.4); border-color: #f00; }
+#ring.scroll { border-color: #08f; border-style: dashed; }
+#ring.off { border-color: #888; }
+#ring.fist { border-color: #fa0; }
+#ring.lock { border-color: #c6f; }
+/* One corner island, bottom-right inside the work area; the rest of the screen stays clear. Glass = dark tint + 1px edge
+   (a transparent window cannot blur the desktop behind it). */
+#dock { z-index: 2; position: fixed; right: calc(var(--right, 0px) + 16px); bottom: calc(var(--bottom, 0px) + 16px); display: flex; flex-direction: column; gap: 8px; }
+#panel, #talk { color: #faf9f5; background: rgba(24, 23, 21, 0.78); border: 1px solid rgba(250, 249, 245, 0.14); border-radius: 12px; text-shadow: 0 1px 2px #000; }
+#panel { overflow: hidden; align-self: flex-end; } /* the icon row sets the HUD width */
+#view { position: relative; aspect-ratio: 4 / 3; background: #000; }
+video, #bones { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+#foot { display: flex; flex-wrap: wrap; gap: 0 8px; padding: 0 8px 6px; font-size: 12px; color: #c8c5bd; }
+#status.on { color: #8fd18f; }
+#pose { font-weight: 500; color: #6cc4ff; }
+/* Buttons are clicked with the hand mouse, so they are big. */
+#bar { display: flex; gap: 6px; padding: 6px; }
+#bar button { width: 44px; height: 44px; padding: 0; font: inherit; font-size: 14px; font-weight: 500; color: #faf9f5; background: rgba(250, 249, 245, 0.12); border: 1px solid rgba(250, 249, 245, 0.25); border-radius: 8px; }
+#bar button.on { background: #1f6fbf; border-color: transparent; } /* blue, darkened so the label keeps 4.5:1 */
+#bar button:disabled { opacity: 0.4; }
+#bar button:hover:not(:disabled) { border-color: #faf9f5; }
+/* Exit stands apart from the toggles and is outlined only, so it reads as "leave", not as another switch. */
+#bar #b-exit { margin-left: 8px; background: none; border-color: rgba(250, 249, 245, 0.5); }
+#talk { contain: inline-size; padding: 6px 8px; box-sizing: border-box; font-size: 13px; line-height: 1.35; }
+/* Left island, opposite #dock: the HUD orb with one line of the newest turn above it, just to see Iris heard you.
+   Clicking the line or 💬 opens the chat window (hud.mjs openChat). Only the line takes the mouse; the orb stays click-through. */
+#odock { z-index: 2; position: fixed; left: calc(var(--left, 0px) + 16px); bottom: calc(var(--bottom, 0px) + 16px); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; pointer-events: none; }
+#odock #talk { pointer-events: auto; }
+#hud-orb { width: 120px; height: 120px; }
+#talk { width: 240px; overflow: hidden; cursor: pointer; }
+#talk > div:not(.now) { display: none; }
+#talk > .now { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#talk:not(:has(.now)) { display: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+#talk > div + div { margin-top: 4px; } /* a gap between turns */
+#talk .you { color: #6cc4ff; }
+#talk .sys { font-size: 0.7em; opacity: 0.65; }
+#talk .sys + .sys { margin-top: 0; } /* tool calls stack tight */
+#talk:empty { display: none; } /* no space until Iris says something */
+/* Gallery View: fullscreen 3D ring of a folder's entries, turned with the ✌ scroll, opened with a double click. */
+#gallery { z-index: 1; position: fixed; inset: 0; background: rgba(24, 23, 21, 0.92); color: #faf9f5; perspective: 900px; display: grid; place-items: center; }
+#gallery[hidden] { display: none; }
+#cards { --cw: 340px; position: relative; width: var(--cw); height: calc(var(--cw) * 0.75 + 44px); transform-style: preserve-3d; transition: transform 0.3s; }
+#cards.live { transition: transform 50ms linear; } /* ✌ scroll: about one camera frame, so the ring glides between wheel events */
+#cards .card { position: absolute; inset: 0; margin: 0; border-radius: 12px; background: #252320; border: 2px solid #3a3733; overflow: hidden; backface-visibility: hidden; }
+#cards .card img { width: 100%; height: calc(var(--cw) * 0.75); object-fit: cover; display: block; }
+#cards .card figcaption { padding: 10px 12px; font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cards .card.front { border-color: #2f8fe0; }
+/* Folders, ⬆ and other files: a big icon in the picture's place, the extension under it. */
+#cards .card .icon { height: calc(var(--cw) * 0.75); display: grid; place-content: center; justify-items: center; font-size: calc(var(--cw) * 0.3); background: #1d1c1a; }
+#cards .card .icon[data-ext]::after { content: attr(data-ext); font-size: 22px; text-transform: uppercase; color: #c8c5bd; }
+#cards .card:is(.dir, .up):not(.front) { border-color: #4a6a8a; }
+#gallery #gup { right: 96px; } /* one click up, always in the same place: no need to find and double-pinch the ⬆ card */
+#ghint { position: absolute; top: 24px; left: 24px; right: 180px; margin: 0; font-size: 16px; }
+#gclose, #gup { position: absolute; top: 16px; right: 16px; width: 64px; height: 64px; font-size: 28px; color: #faf9f5; background: rgba(250, 249, 245, 0.12); border: 1px solid rgba(250, 249, 245, 0.3); border-radius: 50%; }
+/* Viewer: the chosen card full size, zoomed with two hands, sent to Iris only with ✓. */
+#viewer { position: fixed; inset: 0; background: #000; overflow: hidden; }
+#viewer[hidden] { display: none; }
+#big { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+#vbar { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; }
+#vbar button { min-width: 180px; min-height: 64px; font: inherit; font-size: 20px; font-weight: 500; color: #faf9f5; background: rgba(37, 35, 32, 0.85); border: 1px solid rgba(250, 249, 245, 0.4); border-radius: 12px; }
+/* ?pop = the "Iris Camera" window: only the camera and the pose line, filling a normal window. */
+body.pop { background: #181715; }
+.pop #dock { position: static; }
+.pop #panel { align-self: stretch; border: 0; border-radius: 0; }
+.pop :is(#ring, #odock, #gallery, #bar) { display: none !important; }
+/* 16:9 window (hud.mjs keeps the ratio); the 4:3 video and bones crop the same way under object-fit: cover, so they stay aligned. */
+.pop #panel { position: relative; }
+.pop #view { aspect-ratio: auto; height: 100vh; }
+.pop #foot { position: absolute; left: 6px; bottom: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); }
+#vzoom { position: absolute; top: 24px; left: 24px; font-size: 16px; color: #fff; text-shadow: 0 0 4px #000; }
