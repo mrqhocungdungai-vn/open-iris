@@ -3,7 +3,7 @@
 <html lang="vi">
 <meta charset="utf-8" />
 <meta name="color-scheme" content="light dark" />
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' file:" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; img-src 'self' file: blob:" />
 <title>Iris</title>
 <link rel="stylesheet" href="style.css" />
 <header id="top">
@@ -19,6 +19,10 @@
 <!-- Conversation first: the log fills the window. -->
 <section id="p-talk">
   <pre id="log" tabindex="0" aria-label="Hội thoại" data-en-aria-label="Conversation"></pre>
+  <form id="compose">
+    <div id="chips"></div>
+    <div class="line"><button type="button" id="attach" title="Đính kèm ảnh hoặc tệp chữ (hoặc kéo thả vào ô này)" data-en-title="Attach an image or a text file (or drop it on this box)" aria-label="Đính kèm" data-en-aria-label="Attach">📎</button><input id="attach-in" type="file" multiple hidden /><textarea id="say" rows="1" aria-label="Gõ cho Iris" data-en-aria-label="Type to Iris"></textarea><button id="say-send" data-en="Send">Gửi</button></div>
+  </form>
 </section>
 <section id="p-set" class="scroll">
   <label class="row"><span data-en="Language">Ngôn ngữ</span> <select id="lang"></select></label>
@@ -55,6 +59,8 @@
   <label class="feature"><input id="orb-on" type="checkbox" role="switch" checked /> <span><span data-en="Show the orb that reacts to the voices">Hiện quả cầu phản ứng theo giọng nói</span> <small data-en="bottom-left of the window and of the HUD">góc dưới trái cửa sổ và HUD</small></span></label>
   <h2 lang="en">Long Session</h2>
   <label class="feature"><input id="keep-on" type="checkbox" role="switch" checked /> <span><span data-en="Keep long sessions">Giữ phiên dài</span> <small data-en="reconnects by itself when the network drops or Gemini ends the connection (about every 10 min), and Iris keeps the conversation; applies from the next Start">tự nối lại khi rớt mạng hoặc Gemini ngắt kết nối (khoảng mỗi 10 phút), Iris vẫn nhớ cuộc trò chuyện; có hiệu lực từ lần Bắt đầu kế tiếp</small></span></label>
+  <label class="feature"><input id="compose-on" type="checkbox" role="switch" checked /> <span><span data-en="Type, send images and files to Iris">Gõ chữ, gửi ảnh và tệp cho Iris</span> <small data-en="a box under the conversation; PNG/JPEG/WebP images and text files (txt, md, csv, json, code). Drop files on the box to attach them">ô nhập dưới khung hội thoại; ảnh PNG/JPEG/WebP và tệp chữ (txt, md, csv, json, code). Kéo thả vào ô nhập để đính kèm</small></span></label>
+  <label class="feature"><input id="meter-on" type="checkbox" role="switch" checked /> <span><span data-en="Show context level">Hiện mức context</span> <small data-en="a small bar next to the status shows how full Iris's memory of this conversation is; at the mark, Iris forgets the earliest part">thanh nhỏ cạnh trạng thái cho biết bộ nhớ cuộc trò chuyện của Iris đầy đến đâu; tới vạch, Iris quên bớt phần đầu</small></span></label>
   <!-- macOS permissions for the whole app: Hand Task Vision (Accessibility, Camera) and voice (Microphone). -->
   <h2 data-en="macOS permissions">Quyền macOS</h2>
   <fieldset id="perms">
@@ -79,13 +85,14 @@
 <p id="error" role="alert" hidden></p>
 <!-- Bottom strip on every tab: orb left, the run buttons in the middle, Hand Task Vision camera right. A row of its own, so it never covers a tab. -->
 <div id="corner">
-<div id="run"><button id="toggle">Bắt đầu</button> <button id="mute" disabled>🎤 Mic</button> <button id="listen" disabled aria-pressed="false" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂 Chỉ nghe</button> <button id="gallery-open" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼 Gallery</button><span id="status" role="status" data-state="offline">Chưa chạy</span> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label> <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" title="Hướng dẫn HUD: các nút, phím tắt" data-en-title="HUD guide: buttons, shortcuts" aria-label="Hướng dẫn HUD" data-en-aria-label="HUD guide">?</a></div>
+<div id="run"><button id="toggle">Bắt đầu</button> <button id="mute" disabled>🎤 Mic</button> <button id="listen" disabled aria-pressed="false" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂 Chỉ nghe</button> <button id="gallery-open" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼 Gallery</button><span id="status" role="status" data-state="offline">Chưa chạy</span> <span id="ctx" hidden><span class="bar"><span class="fill"></span><span class="mark"></span></span><span></span></span> <button id="ctx-clear" hidden title="Bắt đầu phiên mới: Iris quên toàn bộ cuộc trò chuyện này" data-en-title="Start a new session: Iris forgets this whole conversation"><span data-en="↺ Start over">↺ Làm mới</span></button> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label> <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" title="Hướng dẫn HUD: các nút, phím tắt" data-en-title="HUD guide: buttons, shortcuts" aria-label="Hướng dẫn HUD" data-en-aria-label="HUD guide">?</a></div>
 <!-- Hand Task Vision camera: right end of the strip while vision is on. -->
 <div id="hv-view" class="camera-frame" hidden>
   <video id="hv-cam" autoplay muted playsinline></video>
   <canvas id="hv-bones" width="640" height="480"></canvas>
   <span id="hv-status"></span>
   <span id="hv-pose" role="status"></span>
+  <button id="hv-pop" aria-pressed="false" title="Mở / đóng cửa sổ camera riêng: thu nhỏ được, OBS chọn được" data-en-title="Open / close the camera window: can be minimized, OBS can capture it">⧉</button>
   <button id="hv-hide" aria-pressed="false" title="Thu gọn camera thành 1 dòng / mở lại" data-en-title="Collapse the camera to one line / expand it">▾</button>
 </div>
 <div id="orb"><canvas id="orb-canvas" width="280" height="280" role="img" aria-label="Orb Iris"></canvas></div>
@@ -141,3 +148,5 @@
 <script type="module" src="devices.js"></script>
 <script type="module" src="orb-ui.js"></script>
 <script type="module" src="plugins-ui.js"></script>
+<script type="module" src="ctx-ui.js"></script>
+<script type="module" src="compose-ui.js"></script>

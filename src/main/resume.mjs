@@ -51,6 +51,14 @@ export function createResumer({ connect, onReconnect, onGiveUp, log = () => {}, 
   };
 }
 
+// "↺ Làm mới": drop the session for a new one with no handle and the same setup (connect is the same closure).
+// stop() first, so a reconnect timer or a connect still in flight cannot bring the old one back.
+export async function freshSession(resumer, old) {
+  resumer.stop();
+  try { old?.close(); } catch { /* ignore close races */ }
+  return resumer.start();
+}
+
 // Silent note after a reconnect (S3): what the model cannot know from its own history. S0 showed a cut-off tool call
 // is not re-issued, and the model keeps waiting for it unless told.
 export function resumeNote({ handle, lost = [], listenOnly = false, looking = "" }) {

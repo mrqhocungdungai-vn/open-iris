@@ -105,6 +105,9 @@
     $("hv-hide").setAttribute("aria-pressed", mini);
     $("hv-hide").textContent = mini ? "▴" : "▾";
   };
+  // ⧉: same toggle as the HUD 📷, the "Iris Camera" window (hud.mjs openPop).
+  $("hv-pop").onclick = () => window.gesture.popout();
+  window.gesture.onPopout((on) => $("hv-pop").setAttribute("aria-pressed", on));
   const showSettings = ({ span, mode, side }) => {
     $("mode").value = mode;
     $("side").value = side;

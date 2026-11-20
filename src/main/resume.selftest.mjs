@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createResumer, resumeNote } from "./resume.mjs";
+import { createResumer, freshSession, resumeNote } from "./resume.mjs";
 
 // Fake clock and fake connect: each connect records the handle it was given and returns a closable session.
 function rig({ fail = () => false } = {}) {
@@ -140,6 +140,31 @@ test("a fresh handle resets the attempt count", async () => {
   r.closed(drop); assert.equal(await tick(), 1000);
   r.update({ newHandle: "h3", resumable: true });
   r.closed(drop); assert.equal(await tick(), 500);
+});
+
+test("freshSession (↺ Làm mới) closes the old session and connects with no handle, not as a reconnect", async () => {
+  const { r, calls, back, timers } = rig();
+  const old = await r.start();
+  r.update({ newHandle: "h1", resumable: true });
+  r.closed(drop); // a reconnect was pending
+  const s = await freshSession(r, old);
+  assert.ok(old.closed);
+  assert.ok(s && !s.closed);
+  assert.deepEqual(calls, [null, null]);
+  assert.deepEqual(back, [], "no resume note: it is a new session");
+  assert.equal(timers.length, 0, "the pending reconnect is cancelled");
+  assert.equal(r.live, true);
+});
+
+test("freshSession: a Stop during the new connect closes it when it lands", async () => {
+  let release;
+  const late = { closed: false, close() { this.closed = true; } };
+  const r = createResumer({ connect: () => new Promise((res) => (release = () => res(late))) });
+  const p = freshSession(r, null);
+  r.stop();
+  release();
+  assert.equal(await p, null);
+  assert.ok(late.closed);
 });
 
 test("resumeNote says what history cannot", () => {

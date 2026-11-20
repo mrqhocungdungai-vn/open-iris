@@ -12,13 +12,15 @@ import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
 import { cleanTools, desktopTools } from "./desktop.mjs";
 import { keyFormatOk, liveSetup } from "./live-config.mjs";
-import { createResumer, resumeNote } from "./resume.mjs";
+import { contextMeter } from "./context-meter.mjs";
+import { cleanInput } from "./input.mjs";
+import { createResumer, freshSession, resumeNote } from "./resume.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
 import { cleanPluginConfig, createHooks, loadPlugins, NAME, trustHash } from "./hooks.mjs";
 import { pluginEntry } from "./plugin-list.mjs";
-import { closeHud, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
+import { closeHud, closePop, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
 
 const execFileP = promisify(execFile);
 
@@ -45,7 +47,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false }, welcomed: c?.welcomed === true });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, welcomed: c?.welcomed === true });
 const writeConfig = (c) => fs.writeFileSync(configFile, JSON.stringify(clean(c), null, 2) + "\n");
 function readConfig() {
   try { return clean(JSON.parse(fs.readFileSync(configFile, "utf8"))); } catch { return clean(); }
@@ -84,6 +86,7 @@ let announcing = null; // timer while Iris says "listen mode is on": its output 
 let hooks = null; // plugin hooks (hooks.mjs) of this session
 let userSaid = "", irisSaid = ""; // transcript of the current turn, for UserTurn/IrisTurn hooks
 let resumer = null; // "Giữ phiên dài" (resume.mjs): reconnects a dropped connection as the same session
+let meter = { model: "", keep: true, last: null }; // context meter (context-meter.mjs) of this session; last is resent after a reconnect
 let held = []; // plugin context that came while the connection was down, sent after the reconnect
 const inFlight = new Map(); // tool call id → name, to tell the model which calls a dropped connection cut off
 // trust.json: { [plugin]: sha256 } approved in the Plugin tab. File trust boundary: only names and strings survive.
@@ -137,6 +140,7 @@ async function connectLive(opts) {
   userSaid = irisSaid = "";
   held = [];
   inFlight.clear();
+  meter = { model, keep, last: null };
   const start = await hooks.emit("SessionStart");
   const brief = personaBrief(loadOwner(home), skills) + (start.context ? ` ${start.context}` : "");
   log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none"}`);
@@ -192,6 +196,7 @@ async function connectLive(opts) {
       const note = resumeNote({ handle, lost: [...inFlight.values()], listenOnly, looking });
       inFlight.clear();
       log("INFO", "live", `resumed ${handle ? "with handle" : "fresh"}`);
+      send("live:context", meter.last);
       for (const text of [note, ...held.splice(0)]) {
         try { s.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "live", `resume note: ${e?.message || e}`); }
       }
@@ -205,6 +210,7 @@ async function connectLive(opts) {
 
 function handleMessage(message) {
   resumer?.update(message.sessionResumptionUpdate);
+  if (message.usageMetadata) send("live:context", (meter.last = contextMeter(message.usageMetadata, meter.model, meter.keep))); // once per turn (C0)
   if (message.goAway) log("WARN", "live", `goAway timeLeft=${message.goAway.timeLeft}`);
   if (message.toolCall?.functionCalls) handleToolCalls(message.toolCall.functionCalls);
   // shortcut: a cancelled call still runs to the end; its response is just not sent. Abort execFile if that matters.
@@ -322,6 +328,34 @@ function stopLive() {
   send("live:status", "offline");
   setMuted(false);
   setListenOnly(false);
+}
+// "↺ Làm mới": a new session with no handle and the same setup; mic and 👂 stay as they are, hooks keep running.
+// shortcut: SessionEnd/SessionStart do not fire, so a plugin sees one session; fire them here if a plugin needs the cut.
+let clearing = false;
+async function clearContext() {
+  if (!session || clearing) return;
+  clearing = true;
+  log("INFO", "live", "clear requested");
+  const old = session;
+  session = null; // old's onclose then sees it is not the current connection and does nothing
+  inFlight.clear();
+  held = [];
+  userSaid = irisSaid = "";
+  send("live:interrupt");
+  send("live:context", (meter.last = null));
+  send("live:status", "connecting");
+  try {
+    session = await freshSession(resumer, old); // null when Stop came during the connect: start() closed it
+  } catch (e) {
+    log("ERROR", "live", `clear: ${e?.message || e}`);
+    endSession({ reason: e?.message || String(e) });
+  } finally {
+    clearing = false;
+  }
+  if (!session) return;
+  // The new session does not know: say it silently, as after a reconnect.
+  if (listenOnly) session.sendClientContent({ turns: [{ role: "user", parts: [{ text: "[session] Listen mode is ON: keep listening, do not reply, do not speak and do not call any tool until it ends." }] }], turnComplete: false });
+  if (looking) tellLooking();
 }
 function setMuted(on) {
   muted = on;
@@ -464,7 +498,9 @@ ipcMain.handle("config:mic", (_e, mic) => {
   writeConfig({ ...readConfig(), mic });
   log("INFO", "devices", `mic ${JSON.stringify(readConfig().mic?.label ?? "default")}`);
 });
-ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { keep: on !== false } })); // clean() keeps only a boolean
+ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, keep: on !== false } })); // clean() keeps only a boolean
+ipcMain.handle("config:compose", (_e, on) => writeConfig({ ...readConfig(), compose: on !== false }));
+ipcMain.handle("config:meter", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, meter: on !== false } }));
 ipcMain.handle("config:welcomed", () => writeConfig({ ...readConfig(), welcomed: true }));
 // Welcome wizard: check the key against Gemini, then keep it in ~/.open-iris/.env (0600). Returns "" or an error text.
 ipcMain.handle("key:save", async (_e, key) => {
@@ -484,6 +520,16 @@ ipcMain.handle("key:save", async (_e, key) => {
 });
 ipcMain.handle("live:start", (_e, opts) => startLive(opts));
 ipcMain.handle("live:stop", () => stopLive());
+ipcMain.on("live:clear", () => clearContext());
+// Manual input box (compose-ui.js): typed text, images and text files as one user turn. label is for the log only.
+ipcMain.handle("live:input", (_e, parts, label) => {
+  const clean = cleanInput(parts);
+  if (!session || !clean) return false;
+  log("INFO", "input", `typed turn: ${clean.map((p) => p.inlineData?.mimeType || "text").join(", ")}`);
+  try { session.sendClientContent({ turns: [{ role: "user", parts: clean }], turnComplete: true }); } catch (e) { log("ERROR", "input", e?.message || String(e)); return false; }
+  send("live:log", `⌨ ${String(label || "").slice(0, 300)}`);
+  return true;
+});
 // HUD buttons: Start/Stop goes through the main window so it uses that window's model/voice/tool picks.
 ipcMain.handle("live:state", () => ({ status: liveStatus, muted, listenOnly }));
 ipcMain.on("iris:toggle", () => win && !win.isDestroyed() && win.webContents.send("iris:toggle"));
@@ -577,7 +623,7 @@ app.whenReady().then(() => {
     webPreferences: { preload: path.join(import.meta.dirname, "../preload/preload.cjs"), backgroundThrottling: false },
   });
   pipeLogs(win.webContents);
-  win.on("closed", closeHud); // the HUD is click-through, so it must not outlive the window that controls it
+  win.on("closed", () => (closeHud(), closePop())); // the HUD is click-through and the pop-out has no engine, so neither outlives this window
   win.loadFile("src/renderer/index.html");
 });
 

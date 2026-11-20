@@ -111,11 +111,12 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 #hv-pose { bottom: 6px; left: 6px; font-weight: 500; color: #6cc4ff; }
 #hv-status:empty, #hv-pose:empty { display: none; }
 #hv-hide { position: absolute; top: 4px; left: 4px; display: grid; place-items: center; min-block-size: 0; min-inline-size: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--on-stage); color: var(--stage); font-size: 22px; font-weight: 700; line-height: 1; }
-#hv-hide:hover { background: #fff; }
+#hv-hide:hover, #hv-pop:hover { background: #fff; }
+#hv-pop { position: absolute; top: 4px; left: 36px; display: grid; place-items: center; min-block-size: 0; min-inline-size: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--on-stage); color: var(--stage); font-size: 15px; font-weight: 700; line-height: 1; }
 /* Collapsed: one line (▴ · pose · status) so the page gets the space back. */
 #hv-view.mini { width: auto; max-width: calc(100% - 16px); aspect-ratio: auto; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 999px; }
 #hv-view.mini :is(video, canvas) { width: 1px; height: 1px; opacity: 0; } /* still on the page: the engine reads frames from the video */
-#hv-view.mini :is(#hv-hide, #hv-status, #hv-pose) { position: static; }
+#hv-view.mini :is(#hv-hide, #hv-pop, #hv-status, #hv-pose) { position: static; }
 
 /* Orb: left end of the strip, drawn by orb.js. */
 #orb { order: -1; width: 150px; height: 150px; display: grid; place-items: center; pointer-events: none; }
@@ -135,6 +136,23 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 #status[data-state="listening"]::before { background: var(--ok); }
 #status[data-state="speaking"]::before { background: var(--accent); }
 #status:not([data-state="offline"]) { color: var(--text); font-weight: 500; }
+#ctx { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+#ctx .bar { position: relative; width: 56px; height: 4px; border-radius: 2px; background: var(--hair); }
+#ctx .fill { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--muted); }
+#ctx .mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); }
+#ctx[data-near] .fill { background: var(--wait); }
+
+/* Manual input box (compose-ui.js) under #log. */
+#compose { display: flex; flex-direction: column; gap: 6px; }
+#compose .line { display: flex; gap: 6px; align-items: flex-end; }
+#compose textarea { flex: 1; min-height: 36px; max-height: 120px; resize: none; font: inherit; padding: 8px 10px; border-radius: 10px; }
+#compose[data-drop] textarea { outline: 2px dashed var(--accent); }
+#chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#chips:empty { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 8px; border: 1px solid var(--hair); border-radius: 999px; font-size: 12px; }
+.chip img { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; }
+.chip[data-bad] { color: #c0563f; border-color: #c0563f; }
+.chip button { padding: 0 6px; min-height: 0; }
 #hud-box { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 #hud-guide-link { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 12px; text-decoration: none; }
 #error { margin: 0; padding: 8px 12px; border: 1px solid var(--bad); border-radius: 8px; background: var(--error-bg); overflow-wrap: anywhere; }

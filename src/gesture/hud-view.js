@@ -11,15 +11,18 @@ let vision = false;
 let camera = false;
 let cam = null; // Settings › Camera, same device as engine.js
 let stream = null;
+const POP = new URLSearchParams(location.search).has("pop"); // this page is the "Iris Camera" window
+let popped = false; // an "Iris Camera" window is open: the HUD leaves the camera to it
+const wanted = () => vision && (POP || (camera && !popped)); // the pop-out exists to show the camera: 📷 does not apply there
 const bones = $("bones").getContext("2d");
 const drawer = new DrawingUtils(bones);
 
 async function syncCamera() {
-  const want = vision && camera;
+  const want = wanted();
   $("view").hidden = !want;
   if (want && !stream) {
     stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, ...deviceConstraint(cam) } });
-    if (!(vision && camera)) return syncCamera(); // switched off while the camera was opening
+    if (!wanted()) return syncCamera(); // switched off while the camera was opening
     $("cam").srcObject = stream;
   } else if (!want && stream) {
     stream.getTracks().forEach((t) => t.stop());
@@ -34,6 +37,7 @@ window.gesture.onVision((on) => {
   if (!on) show(null);
   resync();
 });
+window.gesture.onPopout((on) => ((popped = on), resync()));
 window.gesture.onSettings((s) => {
   if (stream && s.cam?.id !== cam?.id) {
     stream.getTracks().forEach((t) => t.stop()); // another camera picked: drop this stream, syncCamera opens the new one

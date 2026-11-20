@@ -108,7 +108,7 @@ function setVision(on) {
 }
 ipcMain.on("vision", (_e, on) => setVision(on === true));
 // Engine → HUD, every frame while vision runs (null = no ring). HUD gallery open/closed → engine (two-hand zoom).
-ipcMain.on("hand", (_e, s) => win?.webContents.send("hand", s));
+ipcMain.on("hand", (_e, s) => { win?.webContents.send("hand", s); pop?.webContents.send("hand", s); });
 ipcMain.on("hud:gallery", (_e, on) => {
   broadcast("hud:gallery", on === true);
   if (!on && gallery) setGallery(null); // closed with ✕ in the overlay
@@ -191,7 +191,7 @@ function setDock(on) {
   log("INFO", "app", on ? "HUD on" : "HUD off");
   broadcast("hud", on);
   // HUD is a mode: it replaces the main window (engine and voice keep running hidden); ✕ Thoát HUD or ⌃⌥H brings it back.
-  for (const w of BrowserWindow.getAllWindows()) if (w !== win) on ? w.hide() : w.show();
+  for (const w of BrowserWindow.getAllWindows()) if (w !== win && w !== pop) on ? w.hide() : w.show(); // the pop-out stays as the user left it
   syncOverlay();
   // The main window is hidden in HUD mode, so the menu bar icon is the way back.
   if (on && !tray) {
@@ -201,6 +201,34 @@ function setDock(on) {
   } else if (!on) tray = (tray?.destroy(), null);
 }
 let tray = null;
+
+// "Iris Camera": the hand camera (video, bones, pose) in a normal macOS window, so OBS Window Capture can pick it and it can be
+// minimized. The HUD 📷 opens and closes it; it also closes with the main window.
+let pop = null;
+function openPop() {
+  if (pop) return pop.show(); // show() also brings it back from the Dock
+  pop = new BrowserWindow({
+    title: "Iris Camera", width: 480, height: 270, useContentSize: true, backgroundColor: "#181715",
+    webPreferences: { preload: path.join(dir, "..", "preload", "preload.cjs"), backgroundThrottling: false }, // OBS keeps getting frames behind other apps
+  });
+  pop.on("page-title-updated", (e) => e.preventDefault()); // keep the name OBS lists
+  // shortcut: shows the engine's 640x480 frame cropped to 16:9 (top and bottom cut), upgrade to a 1280x720 stream once bones are mapped to its field of view
+  pop.setAspectRatio(16 / 9);
+  pipeLogs(pop.webContents);
+  pop.webContents.on("did-finish-load", () => {
+    pop.webContents.send("control", control);
+    pop.webContents.send("vision", vision);
+    pop.webContents.send("settings", settings);
+  });
+  pop.on("closed", () => { pop = null; log("INFO", "app", "camera pop-out closed"); broadcast("popout", false); });
+  pop.loadFile(path.join(dir, "index.html"), { query: { pop: "1" } });
+  log("INFO", "app", "camera pop-out open");
+  broadcast("popout", true); // the HUD drops its own preview stream
+}
+ipcMain.on("popout", () => (pop ? pop.close() : openPop()));
+export function closePop() {
+  pop?.close();
+}
 // main.mjs: the footer 🖼 Gallery button, a dropped folder or the HUD 🖼 button. null closes it.
 export function setGallery(g) {
   gallery = g;

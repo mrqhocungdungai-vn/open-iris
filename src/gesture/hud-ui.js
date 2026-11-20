@@ -16,8 +16,17 @@ function setLang(lang) {
 const WHEEL_STEP = 120; // scroll px per card turn; the ✌ scroll sends a few tens of px per frame
 const SNAP_MS = 150; // no wheel for this long = the hand stopped: settle on the nearest card
 
+// The "Iris Camera" window (hud.mjs openPop) loads this page with ?pop: only the camera panel, no overlay duties.
+const POP = new URLSearchParams(location.search).has("pop");
+if (POP) {
+  document.body.classList.add("pop");
+  $("dock").hidden = false;
+  window.iris.getConfig().then((c) => setLang(c.lang));
+}
+
 let overDock = false;
 const interactive = () => {
+  if (POP) return; // a normal window: click-through and the gallery belong to the overlay
   window.gesture.interactive(overDock || !$("gallery").hidden);
   window.gesture.hudGallery(!$("gallery").hidden); // the engine (main window) zooms with two hands only while it is open
 };
@@ -27,8 +36,8 @@ for (const id of ["dock", "odock"]) {
 }
 
 // HUD orb: drawn here, driven by the main window (orb-ui.js), which owns the mic and the playback.
-const orb = mountOrb($("hud-orb"));
-window.iris.onOrb((input) => orb.set(input));
+const orb = POP ? null : mountOrb($("hud-orb"));
+window.iris.onOrb((input) => orb?.set(input));
 window.iris.onOrbEnabled((on) => ($("hud-orb").hidden = !on));
 
 // Iris on/off, mic mute and listen-only. The main window runs Start/Stop with its own session/model/voice/tool picks.
@@ -55,10 +64,9 @@ window.iris.onListen((on) => ((listenOnly = on), showButtons()));
 $("b-iris").onclick = () => window.iris.toggle();
 $("b-mute").onclick = () => window.iris.mute(!muted);
 $("b-listen").onclick = () => window.iris.listen(!listenOnly);
-// 📷 = ⌃⌥C: main flips settings.camera and broadcasts it back (hud-view.js opens/closes the preview).
-let cam = true;
-window.gesture.onSettings((s) => $("b-cam").classList.toggle("on", (cam = s.camera)));
-$("b-cam").onclick = () => window.gesture.setSettings({ camera: !cam });
+// 📷 opens / closes the "Iris Camera" window (hud.mjs openPop). ⌃⌥C still toggles the small preview in the dock.
+window.gesture.onPopout((on) => $("b-cam").classList.toggle("on", on));
+$("b-cam").onclick = () => window.gesture.popout();
 $("b-exit").onclick = () => window.gesture.hud(false); // back to the main window (hud.mjs setDock shows it)
 
 // Transcript: the same lines as the main window's log.
@@ -108,8 +116,9 @@ $("b-gallery").onclick = () =>
   window.iris.openGallery().then((why) => why && ($("status").textContent = tr("Không mở được gallery: ", "Could not open the gallery: ") + why))
     .catch((e) => ($("status").textContent = tr("Không mở được gallery: ", "Could not open the gallery: ") + e.message));
 window.iris.onGalleryEnabled((on) => ($("b-gallery").hidden = !on)); // only while Features › Gallery View is on
-window.iris.onGallery((g) => (g ? show(g) : overlay.hidden || close()));
+window.iris.onGallery((g) => POP || (g ? show(g) : overlay.hidden || close()));
 window.gesture.onHud((on) => {
+  if (POP) return;
   $("dock").hidden = $("odock").hidden = !on;
   if (on) window.iris.getConfig().then((c) => setLang(c.lang));
 });

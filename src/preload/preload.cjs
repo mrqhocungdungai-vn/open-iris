@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("iris", {
   saveWelcomed: () => ipcRenderer.invoke("config:welcomed"),
   saveLang: (lang) => ipcRenderer.invoke("config:lang", lang),
   saveKeep: (on) => ipcRenderer.invoke("config:keep", on), // Features › Giữ phiên dài → config.session.keep
+  saveMeter: (on) => ipcRenderer.invoke("config:meter", on), // Features › Hiện mức context → config.session.meter
+  saveCompose: (on) => ipcRenderer.invoke("config:compose", on), // Features › Gõ chữ, gửi ảnh và tệp → config.compose
   saveMic: (mic) => ipcRenderer.invoke("config:mic", mic), // { id, label } or null = system default
   saveOwner: (text) => ipcRenderer.invoke("owner:set", text), // ~/.open-iris/IRIS.md
   openSkills: () => ipcRenderer.invoke("skills:open"), // "" or an error text
@@ -39,6 +41,9 @@ contextBridge.exposeInMainWorld("iris", {
   onInterrupt: on("live:interrupt"),
   onStatus: on("live:status"),
   onLog: on("live:log"),
+  onContext: on("live:context"), // { used, max, trimAt } once per turn, null after "↺ Làm mới"
+  sendInput: (parts, label) => ipcRenderer.invoke("live:input", parts, label), // typed turn → true if sent
+  clearContext: () => ipcRenderer.send("live:clear"), // "↺ Làm mới": a new session, same setup, mic and 👂 kept
   // HUD buttons (gesture/hud-ui.js); the main window runs the actual Start/Stop.
   toggle: () => ipcRenderer.send("iris:toggle"),
   onToggle: on("iris:toggle"),
@@ -71,4 +76,6 @@ contextBridge.exposeInMainWorld("gesture", {
   openSettings: (kind) => ipcRenderer.send("open-settings", kind),
   revealHost: () => ipcRenderer.send("perms:reveal"),
   interactive: (on) => ipcRenderer.send("hud:interactive", on), // HUD stops being click-through over its buttons
+  popout: () => ipcRenderer.send("popout"), // HUD 📷 and main window ⧉: open / close the "Iris Camera" window (hud.mjs openPop)
+  onPopout: on("popout"),
 });

@@ -72,6 +72,15 @@
   #big { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   #vbar { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; }
   #vbar button { min-width: 180px; min-height: 64px; font: inherit; font-size: 20px; font-weight: 500; color: #faf9f5; background: rgba(37, 35, 32, 0.85); border: 1px solid rgba(250, 249, 245, 0.4); border-radius: 12px; }
+  /* ?pop = the "Iris Camera" window: only the camera and the pose line, filling a normal window. */
+  body.pop { background: #181715; }
+  .pop #dock { position: static; }
+  .pop #panel { align-self: stretch; border: 0; border-radius: 0; }
+  .pop :is(#ring, #odock, #gallery, #bar) { display: none !important; }
+  /* 16:9 window (hud.mjs keeps the ratio); the 4:3 video and bones crop the same way under object-fit: cover, so they stay aligned. */
+  .pop #panel { position: relative; }
+  .pop #view { aspect-ratio: auto; height: 100vh; }
+  .pop #foot { position: absolute; left: 6px; bottom: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); }
   #vzoom { position: absolute; top: 24px; left: 24px; font-size: 16px; color: #fff; text-shadow: 0 0 4px #000; }
 </style>
 <section id="gallery" hidden>
@@ -101,7 +110,7 @@
     <button id="b-mute">🎤</button>
     <button id="b-listen">👂</button>
     <button id="b-gallery" title="Mở Gallery View từ ~/" data-en-title="Open Gallery View at ~/" hidden>🖼</button>
-    <button id="b-cam" title="Hiện / ẩn camera (⌃⌥C)" data-en-title="Show / hide the camera (⌃⌥C)">📷</button>
+    <button id="b-cam" title="Mở / đóng cửa sổ camera riêng: thu nhỏ được, OBS chọn được" data-en-title="Open / close the camera window: can be minimized, OBS can capture it">📷</button>
     <button id="b-talk" title="Phóng to / thu nhỏ hội thoại" data-en-title="Enlarge / shrink the conversation">💬</button>
     <button id="b-exit" title="Thoát HUD, về cửa sổ chính để cấu hình (⌃⌥H)" data-en-title="Leave the HUD, back to the main window to configure (⌃⌥H)" aria-label="Thoát HUD" data-en-aria-label="Exit HUD">✕</button>
   </div>
