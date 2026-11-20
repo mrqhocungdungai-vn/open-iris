@@ -6,7 +6,7 @@ const fatal = (c) => c?.code === 1007 || /exhausted|quota/i.test(c?.reason || ""
 // 1008 "BidiGenerateContent session not found" = invalid or expired handle: start a fresh session at once.
 const staleHandle = (c) => c?.code === 1008 && /session not found/i.test(c?.reason || "");
 
-export function createResumer({ connect, onGiveUp, log = () => {}, setTimeout = globalThis.setTimeout, clearTimeout = globalThis.clearTimeout, maxAttempts = 5 }) {
+export function createResumer({ connect, onReconnect, onGiveUp, log = () => {}, setTimeout = globalThis.setTimeout, clearTimeout = globalThis.clearTimeout, maxAttempts = 5 }) {
   let gen = 0, live = false, handle = null, attempts = 0, timer = null;
 
   // A connect that lands after stop() belongs to no session: close it.
@@ -14,6 +14,7 @@ export function createResumer({ connect, onGiveUp, log = () => {}, setTimeout = 
     let s;
     try { s = await connect(handle); } catch (e) { if (g === gen) closed({ reason: e?.message || String(e) }); return null; }
     if (g !== gen) { try { s?.close(); } catch {} return null; }
+    onReconnect?.(s, handle);
     return s;
   }
 
@@ -44,5 +45,17 @@ export function createResumer({ connect, onGiveUp, log = () => {}, setTimeout = 
     update(u) { if (live && u?.resumable && u.newHandle) { handle = u.newHandle; attempts = 0; } },
     closed,
     get handle() { return handle; },
+    get live() { return live; }, // false after stop() or give-up
   };
+}
+
+// Silent note after a reconnect (S3): what the model cannot know from its own history. S0 showed a cut-off tool call
+// is not re-issued, and the model keeps waiting for it unless told.
+export function resumeNote({ handle, lost = [], listenOnly = false, looking = "" }) {
+  return [
+    handle ? "[session] The connection dropped and was restored; the conversation continues." : "[session] The connection dropped and you are now in a new session: the earlier conversation is lost.",
+    lost.length && `The tool call(s) ${lost.join(", ")} were cut off and their results are lost; check before repeating them.`,
+    listenOnly && "Listen mode is still ON.",
+    looking && `[gallery] The user is looking at the image ${looking}.`,
+  ].filter(Boolean).join(" ");
 }

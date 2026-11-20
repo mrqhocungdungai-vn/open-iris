@@ -12,6 +12,7 @@ import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
 import { cleanTools, desktopTools } from "./desktop.mjs";
 import { keyFormatOk, liveSetup } from "./live-config.mjs";
+import { createResumer, resumeNote } from "./resume.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
@@ -44,7 +45,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), welcomed: c?.welcomed === true });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false }, welcomed: c?.welcomed === true });
 const writeConfig = (c) => fs.writeFileSync(configFile, JSON.stringify(clean(c), null, 2) + "\n");
 function readConfig() {
   try { return clean(JSON.parse(fs.readFileSync(configFile, "utf8"))); } catch { return clean(); }
@@ -82,6 +83,9 @@ let listenOnly = false; // 👂: Iris's audio and transcript are dropped and too
 let announcing = null; // timer while Iris says "listen mode is on": its output passes the listen-only gate until then
 let hooks = null; // plugin hooks (hooks.mjs) of this session
 let userSaid = "", irisSaid = ""; // transcript of the current turn, for UserTurn/IrisTurn hooks
+let resumer = null; // "Giữ phiên dài" (resume.mjs): reconnects a dropped connection as the same session
+let held = []; // plugin context that came while the connection was down, sent after the reconnect
+const inFlight = new Map(); // tool call id → name, to tell the model which calls a dropped connection cut off
 // trust.json: { [plugin]: sha256 } approved in the Plugin tab. File trust boundary: only names and strings survive.
 const trustFile = path.join(home, "trust.json");
 function readTrust() {
@@ -93,7 +97,7 @@ function readTrust() {
 // A second live:start while one is still connecting is a no-op.
 let starting = false;
 async function startLive(opts) {
-  if (session || starting) return;
+  if (session || starting || resumer?.live) return; // live = still connecting or reconnecting
   starting = true;
   try {
     await connectLive(opts);
@@ -104,7 +108,7 @@ async function startLive(opts) {
 
 async function connectLive(opts) {
   const { lang, model, voice, tools, skills: skillOn } = clean(opts);
-  const saved = readConfig();
+  const saved = readConfig(), keep = saved.session.keep;
   writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn } }); // keeps the switches of skills not listed now
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -125,11 +129,14 @@ async function connectLive(opts) {
       return true;
     },
     addContext: (text) => {
+      if (!session && resumer?.live) return void held.push(text); // shortcut: unbounded while down, fine for ~30s of retries; cap it if retries get longer
       try { session?.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "plugins", `context: ${e?.message || e}`); }
     },
     log: (m) => log("INFO", "plugins", m),
   });
   userSaid = irisSaid = "";
+  held = [];
+  inFlight.clear();
   const start = await hooks.emit("SessionStart");
   const brief = personaBrief(loadOwner(home), skills) + (start.context ? ` ${start.context}` : "");
   log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none"}`);
@@ -137,43 +144,67 @@ async function connectLive(opts) {
   chunksOut = 0;
   send("live:status", "connecting");
   const ai = new GoogleGenAI({ apiKey });
-  let me; // this connection; onclose of an older one must not reset a newer session
-  me = session = await ai.live.connect({
-    model,
-    config: {
-      responseModalities: ["AUDIO"],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
-      ...liveSetup(lang, enabledTools, brief),
+  let opened = false; // a reconnect is the same session: hooks keep running, SessionStart does not fire again
+  // Every reconnect resends the exact setup of this Start plus the handle: S0 showed a resume silently keeps the old setup anyway.
+  const open = async (handle) => {
+    let me; // this connection; onclose of an older one must not reset a newer session
+    me = await ai.live.connect({
+      model,
+      config: {
+        responseModalities: ["AUDIO"],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
+        ...liveSetup(lang, enabledTools, brief, { keep, handle }),
+      },
+      callbacks: {
+        onopen: () => {
+          log("INFO", "live", "connected");
+          send("live:status", "listening");
+          if (!opened) hooks.start();
+          opened = true;
+        },
+        onmessage: handleMessage,
+        onerror: (e) => {
+          log("ERROR", "live", `ws error: ${e?.message || e}`);
+          send("live:log", `error: ${e?.message || e}`);
+        },
+        onclose: (e) => {
+          log("INFO", "live", `closed code=${e?.code} reason=${e?.reason || "(none)"} micChunksSent=${chunksIn}`);
+          if (session !== me) return;
+          session = null;
+          // shortcut: a mic muted > 2 min gets 1008 "client inactivity" and reconnects every 2 min; stream silence while muted if that churn shows in the logs.
+          if (keep && resumer?.live) {
+            send("live:status", "connecting");
+            return resumer.closed(e);
+          }
+          endSession(e);
+        },
+      },
+    });
+    return me;
+  };
+  resumer?.stop();
+  resumer = createResumer({
+    connect: open,
+    onReconnect: (s, handle) => {
+      session = s;
+      const note = resumeNote({ handle, lost: [...inFlight.values()], listenOnly, looking });
+      inFlight.clear();
+      log("INFO", "live", `resumed ${handle ? "with handle" : "fresh"}`);
+      for (const text of [note, ...held.splice(0)]) {
+        try { s.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "live", `resume note: ${e?.message || e}`); }
+      }
     },
-    callbacks: {
-      onopen: () => {
-        log("INFO", "live", "connected");
-        send("live:status", "listening");
-        hooks.start();
-      },
-      onmessage: handleMessage,
-      onerror: (e) => {
-        log("ERROR", "live", `ws error: ${e?.message || e}`);
-        send("live:log", `error: ${e?.message || e}`);
-      },
-      onclose: (e) => {
-        // shortcut: no reconnect/session resumption, Gemini closes after ~10 min; port scheduleReconnect from myiris when needed.
-        log("INFO", "live", `closed code=${e?.code} reason=${e?.reason || "(none)"} micChunksSent=${chunksIn}`);
-        if (session !== me) return;
-        session = null;
-        endHooks();
-        setListenOnly(false);
-        send("live:log", `closed: ${e?.code} ${e?.reason || ""}`);
-        send("live:status", "offline");
-      },
-    },
+    onGiveUp: endSession,
+    log: (level, m) => log(level, "live", m),
   });
+  session = await resumer.start();
   if (looking) tellLooking(); // an image was already open before Iris started
 }
 
 function handleMessage(message) {
+  resumer?.update(message.sessionResumptionUpdate);
   if (message.goAway) log("WARN", "live", `goAway timeLeft=${message.goAway.timeLeft}`);
   if (message.toolCall?.functionCalls) handleToolCalls(message.toolCall.functionCalls);
   // shortcut: a cancelled call still runs to the end; its response is just not sent. Abort execFile if that matters.
@@ -229,6 +260,14 @@ function endTurn() {
   if (you) h?.emit("UserTurn", { text: you }).catch((e) => log("ERROR", "plugins", `UserTurn: ${e.message}`));
   if (iris) h?.emit("IrisTurn", { text: iris }).catch((e) => log("ERROR", "plugins", `IrisTurn: ${e.message}`));
 }
+// The session is over for good (keep off, give-up): same teardown as the old onclose.
+function endSession(e) {
+  resumer?.stop();
+  endHooks();
+  setListenOnly(false);
+  send("live:log", `closed: ${e?.code ?? ""} ${e?.reason || ""}`);
+  send("live:status", "offline");
+}
 function endHooks() {
   const h = hooks;
   h?.stop();
@@ -243,6 +282,7 @@ async function handleToolCalls(calls) {
     try { s?.sendToolResponse({ functionResponses: refuseCalls(calls) }); } catch (e) { log("ERROR", "tool", `sendToolResponse: ${e?.message || e}`); }
     return;
   }
+  for (const { id, name } of calls) inFlight.set(id, name);
   const functionResponses = await Promise.all(calls.map(async ({ id, name, args }) => {
     const tool = enabledTools.find((t) => t.name === name);
     const pre = (await h?.emit("PreToolCall", { tool: { name, args } })) ?? { block: false, context: "" };
@@ -256,6 +296,7 @@ async function handleToolCalls(calls) {
     const context = [pre.context, post.context].filter(Boolean).join(" ");
     return { id, name, response: context ? { ...out, context } : out };
   }));
+  for (const { id } of calls) inFlight.delete(id);
   // A cancelled call's response is never sent, nor any response for a session that has ended since.
   const live = functionResponses.filter((f) => !cancelledCalls.delete(f.id));
   if (s !== session || !live.length) return;
@@ -274,7 +315,8 @@ function stopLive() {
   if (session) log("INFO", "live", "stop requested");
   const s = session;
   session = null;
-  if (s) endHooks();
+  if (s || resumer?.live) endHooks(); // live: stopped while (re)connecting, hooks still run
+  resumer?.stop();
   try { s?.close(); } catch { /* ignore close races */ }
   send("live:interrupt");
   send("live:status", "offline");
@@ -422,6 +464,7 @@ ipcMain.handle("config:mic", (_e, mic) => {
   writeConfig({ ...readConfig(), mic });
   log("INFO", "devices", `mic ${JSON.stringify(readConfig().mic?.label ?? "default")}`);
 });
+ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { keep: on !== false } })); // clean() keeps only a boolean
 ipcMain.handle("config:welcomed", () => writeConfig({ ...readConfig(), welcomed: true }));
 // Welcome wizard: check the key against Gemini, then keep it in ~/.open-iris/.env (0600). Returns "" or an error text.
 ipcMain.handle("key:save", async (_e, key) => {

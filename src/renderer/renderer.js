@@ -134,6 +134,7 @@ config.then((c) => {
     $("tools").append(label);
   }
   $("owner").value = c.owner;
+  $("keep-on").checked = c.session.keep;
   for (const { name, description } of c.options.skills) {
     // SKILL.md text is the owner's file: textContent only, never innerHTML.
     const label = document.createElement("label");
@@ -150,6 +151,7 @@ config.then((c) => {
   }
 });
 const groupName = () => tr("Điều khiển máy tính (agent-desktop)", "Computer control (agent-desktop)");
+$("keep-on").onchange = () => window.iris.saveKeep($("keep-on").checked); // Features › Giữ phiên dài, read by main at Start
 $("lang").onchange = () => (setLang($("lang").value), window.iris.saveLang($("lang").value));
 document.addEventListener("langchange", () => {
   document.querySelectorAll("#tools strong").forEach((h) => (h.textContent = groupName()));

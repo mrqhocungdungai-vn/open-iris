@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("iris", {
   saveKey: (key) => ipcRenderer.invoke("key:save", key), // checked against Gemini first; "" or an error text
   saveWelcomed: () => ipcRenderer.invoke("config:welcomed"),
   saveLang: (lang) => ipcRenderer.invoke("config:lang", lang),
+  saveKeep: (on) => ipcRenderer.invoke("config:keep", on), // Features › Giữ phiên dài → config.session.keep
   saveMic: (mic) => ipcRenderer.invoke("config:mic", mic), // { id, label } or null = system default
   saveOwner: (text) => ipcRenderer.invoke("owner:set", text), // ~/.open-iris/IRIS.md
   openSkills: () => ipcRenderer.invoke("skills:open"), // "" or an error text

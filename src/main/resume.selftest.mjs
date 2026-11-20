@@ -1,22 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createResumer } from "./resume.mjs";
+import { createResumer, resumeNote } from "./resume.mjs";
 
 // Fake clock and fake connect: each connect records the handle it was given and returns a closable session.
 function rig({ fail = () => false } = {}) {
-  const timers = [], calls = [], gaveUp = [];
+  const timers = [], calls = [], gaveUp = [], back = [];
   const connect = async (handle) => {
     calls.push(handle);
     if (fail(calls.length)) throw new Error("network down");
     return { closed: false, close() { this.closed = true; } };
   };
   const r = createResumer({
-    connect, onGiveUp: (c) => gaveUp.push(c),
+    connect, onGiveUp: (c) => gaveUp.push(c), onReconnect: (s, h) => back.push(h),
     setTimeout: (fn, ms) => { const t = { fn, ms }; timers.push(t); return t; },
     clearTimeout: (t) => { const i = timers.indexOf(t); if (i >= 0) timers.splice(i, 1); },
   });
   const tick = async () => { const t = timers.shift(); t.fn(); await new Promise((res) => setImmediate(res)); return t.ms; };
-  return { r, timers, calls, gaveUp, tick };
+  return { r, timers, calls, gaveUp, back, tick };
 }
 const drop = { code: 1006, reason: "" };
 
@@ -29,13 +29,15 @@ test("an update with resumable:false keeps the last handle", async () => {
 });
 
 test("a drop reconnects with the newest handle", async () => {
-  const { r, calls, tick } = rig();
+  const { r, calls, back, tick } = rig();
   await r.start();
+  assert.deepEqual(back, [], "the first connect is not a reconnect");
   r.update({ newHandle: "h1", resumable: true });
   r.update({ newHandle: "h2", resumable: true });
   r.closed(drop);
   assert.equal(await tick(), 500);
   assert.deepEqual(calls, [null, "h2"]);
+  assert.deepEqual(back, ["h2"], "onReconnect gets the handle it resumed with");
 });
 
 test("backoff doubles, the handle is dropped from attempt 3, and give-up fires once after 5", async () => {
@@ -48,6 +50,7 @@ test("backoff doubles, the handle is dropped from attempt 3, and give-up fires o
   assert.deepEqual(delays, [500, 1000, 2000, 4000, 8000]);
   assert.deepEqual(calls, [null, "h1", "h1", null, null, null]);
   assert.equal(gaveUp.length, 1);
+  assert.equal(r.live, false);
   r.closed(drop);
   assert.equal(gaveUp.length, 1, "no second give-up");
 });
@@ -109,4 +112,13 @@ test("a fresh handle resets the attempt count", async () => {
   r.closed(drop); assert.equal(await tick(), 1000);
   r.update({ newHandle: "h3", resumable: true });
   r.closed(drop); assert.equal(await tick(), 500);
+});
+
+test("resumeNote says what history cannot", () => {
+  assert.equal(resumeNote({ handle: "h" }), "[session] The connection dropped and was restored; the conversation continues.");
+  const n = resumeNote({ handle: null, lost: ["click"], listenOnly: true, looking: "/a.png" });
+  assert.match(n, /new session/);
+  assert.match(n, /click were cut off/);
+  assert.match(n, /Listen mode is still ON/);
+  assert.match(n, /\/a\.png/);
 });
