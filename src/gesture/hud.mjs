@@ -11,6 +11,7 @@ import { spawn, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { cleanDevice } from "../renderer/devices.js";
+import { rendererLevel } from "./logs.js";
 import { chatPlace } from "./talk.js";
 
 // main.mjs owns the log and the data folder (~/.open-iris); it calls initGesture() once at startup.
@@ -183,9 +184,8 @@ ipcMain.handle("hud", (_e, on) => setDock(on === true));
 ipcMain.on("hud:interactive", (_e, on) => win?.setIgnoreMouseEvents(on !== true, { forward: true }));
 
 // Renderer console.* and crashes into main.log, for both windows.
-const rendererLevel = { debug: "DEBUG", info: "INFO", warning: "WARN", error: "ERROR" };
 export function pipeLogs(wc) {
-  wc.on("console-message", (e) => log(rendererLevel[e.level] || "INFO", "renderer", e.message));
+  wc.on("console-message", (e) => log(rendererLevel(e.level, e.message), "renderer", e.message));
   wc.on("render-process-gone", (_e, d) => log("ERROR", "renderer", `gone reason=${d.reason}`));
 }
 
