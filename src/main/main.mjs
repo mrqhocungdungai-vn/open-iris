@@ -11,10 +11,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
 import { cleanTools, desktopTools } from "./desktop.mjs";
-import { keyFormatOk, liveSetup } from "./live-config.mjs";
+import { keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput } from "./input.mjs";
 import { createResumer, freshSession, resumeNote } from "./resume.mjs";
+import { ago, rms16, VOICE_RMS } from "./perf.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
@@ -41,7 +42,7 @@ if (!fs.existsSync(envFile) && fs.existsSync(repoEnv)) {
 // Real env vars win: loadEnvFile does not overwrite variables that are already set.
 try { process.loadEnvFile(envFile); } catch { /* no .env: rely on real env */ }
 
-const MODELS = ["models/gemini-3.8-live", "models/gemini-3.8-live-extended-thinking", "models/gemini-3.1-flash-live-preview"];
+const MODELS = ["models/gemini-3.8-live", "models/gemini-3.1-flash-live-preview"];
 const VOICES = ["Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Aoede", "Leda", "Orus"];
 const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
@@ -72,6 +73,8 @@ let win = null;
 let session = null;
 let chunksIn = 0; // mic chunks sent this session
 let chunksOut = 0; // audio chunks received this turn
+// [perf] lines (docs/optimize-plan.md §1): V1 last voice -> first Iris audio, V2 toolCall -> toolResponse, V3 connect -> setupComplete.
+let perfConnect = null, lastVoiceAt = 0, lastHeardAt = 0;
 let enabledTools = []; // registry entries switched on for this session
 // The window is already destroyed when window-all-closed calls stopLive().
 // The HUD (gesture/) shows status and transcript too; audio goes to the main window only.
@@ -110,6 +113,7 @@ async function startLive(opts) {
 }
 
 async function connectLive(opts) {
+  perfConnect = { t: Date.now(), kind: "start" };
   const { lang, model, voice, tools, skills: skillOn } = clean(opts);
   const saved = readConfig(), keep = saved.session.keep;
   writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn } }); // keeps the switches of skills not listed now
@@ -179,6 +183,7 @@ async function connectLive(opts) {
           session = null;
           // shortcut: a mic muted > 2 min gets 1008 "client inactivity" and reconnects every 2 min; stream silence while muted if that churn shows in the logs.
           if (keep && resumer?.live) {
+            perfConnect = { t: Date.now(), kind: "reconnect" };
             send("live:status", "connecting");
             return resumer.closed(e);
           }
@@ -211,6 +216,10 @@ async function connectLive(opts) {
 function handleMessage(message) {
   resumer?.update(message.sessionResumptionUpdate);
   if (message.usageMetadata) send("live:context", (meter.last = contextMeter(message.usageMetadata, meter.model, meter.keep))); // once per turn (C0)
+  if (message.setupComplete && perfConnect) {
+    log("INFO", "perf", `V3 ${perfConnect.kind} ms=${Date.now() - perfConnect.t} model=${meter.model}`);
+    perfConnect = null;
+  }
   if (message.goAway) log("WARN", "live", `goAway timeLeft=${message.goAway.timeLeft}`);
   if (message.toolCall?.functionCalls) handleToolCalls(message.toolCall.functionCalls);
   // shortcut: a cancelled call still runs to the end; its response is just not sent. Abort execFile if that matters.
@@ -225,6 +234,7 @@ function handleMessage(message) {
     log("DEBUG", "transcript", `you: ${content.inputTranscription.text}`);
     send("live:log", `you: ${content.inputTranscription.text}`);
     userSaid += content.inputTranscription.text;
+    lastHeardAt = Date.now();
   }
   if (content.outputTranscription?.text && !(listenOnly && !announcing)) irisSaid += content.outputTranscription.text; // dropped words were never heard
   if (content.turnComplete) endTurn();
@@ -248,7 +258,11 @@ function handleMessage(message) {
   for (const part of content.modelTurn?.parts || []) {
     const d = part.inlineData;
     if (!d?.data || !(d.mimeType || "audio/").startsWith("audio/")) continue;
-    if (chunksOut++ === 0) log("INFO", "turn", `speaking (${d.mimeType})`);
+    if (chunksOut++ === 0) {
+      log("INFO", "turn", `speaking (${d.mimeType})`);
+      const now = Date.now();
+      log("INFO", "perf", `V1 voice_ms=${ago(now, lastVoiceAt)} transcript_ms=${ago(now, lastHeardAt)} model=${meter.model}`); // typed turn: from the send; hook turn: since the last voice
+    }
     send("live:audio", { data: d.data, mimeType: d.mimeType || "audio/pcm;rate=24000" });
     send("live:status", "speaking");
   }
@@ -271,6 +285,7 @@ function endSession(e) {
   resumer?.stop();
   endHooks();
   setListenOnly(false);
+  if (refusedModel(e)) send("live:log", readConfig().lang === "en" ? "error: This model is not available. Pick another model in Settings." : "error: Mô hình này chưa dùng được. Hãy chọn mô hình khác trong Thiết lập.");
   send("live:log", `closed: ${e?.code ?? ""} ${e?.reason || ""}`);
   send("live:status", "offline");
 }
@@ -289,6 +304,7 @@ async function handleToolCalls(calls) {
     return;
   }
   for (const { id, name } of calls) inFlight.set(id, name);
+  const t0 = Date.now();
   const functionResponses = await Promise.all(calls.map(async ({ id, name, args }) => {
     const tool = enabledTools.find((t) => t.name === name);
     const pre = (await h?.emit("PreToolCall", { tool: { name, args } })) ?? { block: false, context: "" };
@@ -296,6 +312,7 @@ async function handleToolCalls(calls) {
     // Desktop calls queue up in call order (a click then a type must not race); skill calls run in parallel.
     const r = !tool ? { ok: false, error: `tool not enabled: ${name}` } : tool.desktop ? await (desktopQueue = desktopQueue.then(() => runDesktop(tool, args))) : await tool.run(args);
     const out = r.ok ? { output: r.output } : { error: r.error };
+    log("INFO", "perf", `V2 tool=${name} ms=${Date.now() - t0} ok=${r.ok}`); // includes waiting in desktopQueue
     log("INFO", "tool", `${name} ${JSON.stringify(args || {}).slice(0, 80)} -> ${r.ok ? "ok" : "error"} ${JSON.stringify(out).length}B`);
     if (!r.ok && tool?.desktop) log("WARN", "tool", `${name} ${JSON.stringify(r.error).slice(0, 2000)}`); // why a type or click failed, for the eval loop
     const post = (await h?.emit("PostToolCall", { tool: { name, args }, result: out })) ?? { context: "" };
@@ -306,6 +323,7 @@ async function handleToolCalls(calls) {
   // A cancelled call's response is never sent, nor any response for a session that has ended since.
   const live = functionResponses.filter((f) => !cancelledCalls.delete(f.id));
   if (s !== session || !live.length) return;
+  log("INFO", "perf", `V2 batch=${calls.length} ms=${Date.now() - t0}`);
   try { s.sendToolResponse({ functionResponses: live }); } catch (e) { log("ERROR", "tool", `sendToolResponse: ${e?.message || e}`); }
 }
 
@@ -336,6 +354,7 @@ async function clearContext() {
   if (!session || clearing) return;
   clearing = true;
   log("INFO", "live", "clear requested");
+  perfConnect = { t: Date.now(), kind: "clear" };
   const old = session;
   session = null; // old's onclose then sees it is not the current connection and does nothing
   inFlight.clear();
@@ -527,6 +546,7 @@ ipcMain.handle("live:input", (_e, parts, label) => {
   if (!session || !clean) return false;
   log("INFO", "input", `typed turn: ${clean.map((p) => p.inlineData?.mimeType || "text").join(", ")}`);
   try { session.sendClientContent({ turns: [{ role: "user", parts: clean }], turnComplete: true }); } catch (e) { log("ERROR", "input", e?.message || String(e)); return false; }
+  lastVoiceAt = lastHeardAt = Date.now(); // V1 for a typed turn starts at the send
   send("live:log", `⌨ ${String(label || "").slice(0, 300)}`);
   return true;
 });
@@ -541,8 +561,10 @@ ipcMain.on("iris:listen", (_e, on) => session && setListenOnly(on === true)); //
 ipcMain.on("live:audio-in", (_e, arrayBuffer) => {
   if (!session || muted || !arrayBuffer?.byteLength) return;
   chunksIn++;
+  const buf = Buffer.from(arrayBuffer);
+  if (rms16(buf) > VOICE_RMS) lastVoiceAt = Date.now();
   session.sendRealtimeInput({
-    audio: { data: Buffer.from(arrayBuffer).toString("base64"), mimeType: "audio/pcm;rate=16000" },
+    audio: { data: buf.toString("base64"), mimeType: "audio/pcm;rate=16000" },
   });
 });
 

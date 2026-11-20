@@ -87,6 +87,15 @@ test("a bad key or quota error is not retried", async () => {
   }
 });
 
+test("1008 model not found is not retried, even with a handle", async () => {
+  const { r, timers, gaveUp } = rig();
+  await r.start();
+  r.update({ newHandle: "h1", resumable: true });
+  r.closed({ code: 1008, reason: "models/gemini-x is not found for API version v1beta, or is not supported for bidiGenerateContent." });
+  assert.equal(timers.length, 0);
+  assert.equal(gaveUp.length, 1);
+});
+
 test("a stale handle (1008 session not found) is dropped at once", async () => {
   const { r, calls, tick } = rig();
   await r.start();

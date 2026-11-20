@@ -3,9 +3,10 @@
 
 // 1007 "API key not valid" = bad key. Quota text is from the docs; S0 could not trigger it.
 // Any other 1007 on a fresh connection (e.g. "Thinking level must be specified") is a setup error: retrying cannot help.
-const fatal = (c, handle) => (c?.code === 1007 && (/api key/i.test(c?.reason || "") || !handle)) || /exhausted|quota/i.test(c?.reason || "");
+// 1008 "models/x is not found … or is not supported for bidiGenerateContent" = wrong or unavailable model: fatal too ("session not found" is not).
+const fatal = (c, handle) => (c?.code === 1007 && (/api key/i.test(c?.reason || "") || !handle)) || (c?.code === 1008 && /is not found|not supported for bidiGenerateContent/i.test(c?.reason || "")) || /exhausted|quota/i.test(c?.reason || "");
 // Start a fresh session at once when the handle is useless: 1008 "session not found" = invalid or expired handle;
-// 1011 "Deadline expired" = server's ~58 min session cap, after which resume fails with 1007 "invalid argument" (forum, 2026-10).
+// 1011 "Deadline expired" = server's 58 min session cap. Resume after it connects but dies ~2 min later with 1008 (spike, 2026-11-20).
 const staleHandle = (c) => (c?.code === 1008 && /session not found/i.test(c?.reason || "")) || c?.code === 1007 /* with a handle: fatal() catches it without */ || (c?.code === 1011 && /deadline expired/i.test(c?.reason || ""));
 
 export function createResumer({ connect, onReconnect, onGiveUp, log = () => {}, setTimeout = globalThis.setTimeout, clearTimeout = globalThis.clearTimeout, maxAttempts = 5 }) {

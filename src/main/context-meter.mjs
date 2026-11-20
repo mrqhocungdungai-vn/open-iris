@@ -2,7 +2,6 @@
 // current context size; the API does not report the window, so it is hard-coded per model.
 const WINDOW = {
   "models/gemini-3.8-live": 131072,
-  "models/gemini-3.8-live-extended-thinking": 131072,
   "models/gemini-3.1-flash-live-preview": 131072,
 };
 

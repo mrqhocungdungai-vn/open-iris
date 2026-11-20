@@ -21,8 +21,6 @@ export function liveSetup(lang, enabledTools, brief = "", { keep = false, handle
   return {
     systemInstruction: { parts: [{ text }] },
     // slidingWindow {} = server defaults: trigger at 80% of the model's context, trim to half of that; the system instruction stays.
-    // The extended-thinking model closes with 1007 "Thinking level must be specified" without this. LOW: voice needs low latency.
-    ...(/extended-thinking/.test(model) && { thinkingConfig: { thinkingLevel: "LOW" } }),
     ...(keep && { sessionResumption: handle ? { handle } : {}, contextWindowCompression: { slidingWindow: {} } }),
     ...(enabledTools.length && {
     // shortcut: behavior is sent for every model; drop it if gemini-3.1-flash-live-preview rejects it.
@@ -30,3 +28,7 @@ export function liveSetup(lang, enabledTools, brief = "", { keep = false, handle
     }),
   };
 }
+
+// Start refused for the model (1008 "models/x is not found ... bidiGenerateContent", or 1007 about a thinking config the model needs or refuses).
+// A bad key (1007 "API key ...") and quota keep their own messages.
+export const refusedModel = (c) => (c?.code === 1007 && /thinking/i.test(c?.reason || "")) || (c?.code === 1008 && /models\/\S+ is not found|is not supported for bidiGenerateContent/i.test(c?.reason || ""));
