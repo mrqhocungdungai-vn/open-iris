@@ -40,4 +40,4 @@ A ranked list, most severe first. For each: what can go wrong in plain words, th
 
 ## Limits
 - Do not edit source files. Save scan output and `REPORT.md` in `ops-logs/security/YYYY-MM-DD/` (`scripts/security-scan.sh` does this). It is committed, so use `--redact` and never save a secret, a home path or personal data.
-- Never commit, push, print `.env`, or send code or findings to an outside service other than the scanners' own rule downloads.
+- Commit only your `ops-logs/security/` output, after `gitleaks git --staged --redact` reports no leaks. Never push, print `.env`, or send code or findings to an outside service other than the scanners' own rule downloads.

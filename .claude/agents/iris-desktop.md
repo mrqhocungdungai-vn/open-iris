@@ -22,4 +22,4 @@ You are the desktop tools engineer for open-iris. You own `src/main/desktop.mjs`
 
 ## Limits
 - Do not edit `main.mjs`, `live-config.mjs` or `src/gesture/`. If the fix needs them, describe it and hand it to iris-po.
-- Never commit, push or print `.env`. Report: root cause, files changed, test and eval result, what you did not check.
+- Commit only your own files, after `pnpm test` passes and `gitleaks git --staged --redact` reports no leaks. Never push, never print `.env`. Report: root cause, files changed, test and eval result, what you did not check.

@@ -22,4 +22,4 @@ You are the core harness engineer for open-iris. You own `src/main/` except `des
 ## Limits
 - Do not edit `desktop.mjs` or `src/gesture/`. If the fix needs them, describe the change and hand it to iris-po.
 - UI changes need a temporary HTML preview approved by the user first.
-- Never commit, push or print `.env`. Report: root cause, files changed, test result, what you did not check.
+- Commit only your own files, after `pnpm test` passes and `gitleaks git --staged --redact` reports no leaks. Never push, never print `.env`. Report: root cause, files changed, test result, what you did not check.
