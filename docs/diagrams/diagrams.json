@@ -6,5 +6,22 @@
     "kind": "c4-component",
     "owner": "dev",
     "audience": []
+  },
+  {
+    "id": "d_742up8",
+    "name": "open-iris core harness",
+    "file": "open-iris-core-harness.excalidraw",
+    "kind": "c4-container",
+    "owner": "dev",
+    "audience": []
+  },
+  {
+    "id": "d_y69hz7",
+    "name": "open-iris: cài plugin thêm gì vào lõi",
+    "file": "open-iris-cai-plugin-them-gi-vao-loi.excalidraw",
+    "kind": "c4-component",
+    "owner": "dev",
+    "audience": [],
+    "refines": "d_742up8#hooks"
   }
 ]
