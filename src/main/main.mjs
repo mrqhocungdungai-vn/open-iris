@@ -1,7 +1,7 @@
 // Minimal port of myiris' Gemini Live session (electron/live-session.mjs,
 // live-config.mjs, live-messages.mjs). The API key stays in the main process;
 // the renderer only captures the mic and plays audio.
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, session as sessions, shell } from "electron";
 import { GoogleGenAI } from "@google/genai";
 import fs from "node:fs";
 import os from "node:os";
@@ -22,6 +22,7 @@ import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
 import { cleanPluginConfig, createHooks, loadPlugins, NAME, trustHash } from "./hooks.mjs";
 import { pluginEntry } from "./plugin-list.mjs";
+import { guidePage, permitted } from "./guard.mjs";
 import { closeHud, closePop, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
 
 const execFileP = promisify(execFile);
@@ -640,7 +641,22 @@ function tellLooking() {
 process.on("uncaughtException", (e) => log("ERROR", "main", e?.stack || String(e)));
 process.on("unhandledRejection", (e) => log("ERROR", "main", e?.stack || String(e)));
 
+// Every window has the full window.iris bridge: refuse any page but the app's own (a dropped .html, a link). See guard.mjs.
+app.on("web-contents-created", (_e, wc) => {
+  wc.setWindowOpenHandler(({ url }) => (guidePage(url, app.getAppPath()) ? { action: "allow" } : (log("WARN", "security", `window.open refused: ${url}`), { action: "deny" })));
+  wc.on("will-navigate", (e, url) => {
+    if (guidePage(url, app.getAppPath())) return;
+    e.preventDefault();
+    log("WARN", "security", `navigation refused: ${url}`);
+  });
+});
+
 app.whenReady().then(() => {
+  sessions.defaultSession.setPermissionRequestHandler((wc, permission, done, details) => {
+    const ok = permitted(permission, details.requestingUrl || wc.getURL(), app.getAppPath());
+    if (!ok) log("WARN", "security", `permission refused: ${permission} for ${details.requestingUrl || wc.getURL()}`);
+    done(ok);
+  });
   app.dock?.setIcon(path.join(import.meta.dirname, "../../assets", "icon.png")); // no packaged build yet, so dev would show Electron's icon
   log("INFO", "app", `start electron=${process.versions.electron} level=${process.env.LOG_LEVEL || "info"} log=${logFile}`);
   initGesture(log, home, (on) => {
