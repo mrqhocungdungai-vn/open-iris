@@ -16,7 +16,7 @@ import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput } from "./input.mjs";
 import { createResumer, freshSession, resumeNote } from "./resume.mjs";
-import { ago, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
+import { ago, deafWatch, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanName, cleanSkills, greeting, nameFor, loadPersona, loadSkills, personaBrief, savePersona, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
@@ -76,6 +76,7 @@ let win = null;
 let session = null;
 let chunksIn = 0; // mic chunks sent this session
 let micLevel = micMeter(); // [perf] mic lines, new each Start
+let deaf = null, deafTries = 0, livePlugins = "none"; // deaf-session watch (perf.mjs) of this connection, its fresh-session retries per Start
 let chunksOut = 0; // audio chunks received this turn
 // [perf] lines (docs/optimize-plan.md §1): V1 last voice -> first Iris audio, V2 toolCall -> toolResponse, V3 connect -> setupComplete.
 let perfConnect = null, lastVoiceAt = 0, lastHeardAt = 0;
@@ -165,7 +166,9 @@ async function connectLive(opts) {
   const off = Object.keys(TOOL_DEFAULTS).filter((n) => !tools[n]).concat(hooks.offTools());
   if (abilities) enabledTools = enabledTools.concat(abilitiesTool(enabledTools, off));
   const brief = personaBrief(loadPersona(home), skills, nameFor(saved.name, lang)) + (start.context ? ` ${start.context}` : "");
-  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none"}`);
+  livePlugins = plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none";
+  deafTries = 0;
+  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${livePlugins}`);
   chunksIn = 0;
   chunksOut = 0;
   micLevel = micMeter();
@@ -188,6 +191,7 @@ async function connectLive(opts) {
         onopen: () => {
           if (!current()) return log("INFO", "live", "connected after stop: ignored"); // onopen fires before connect() resolves
           log("INFO", "live", "connected");
+          deaf = deafWatch(); // every connection, until its first inputTranscription
           send("live:status", "listening");
           if (!opened) hooks.start();
           opened = true;
@@ -266,6 +270,7 @@ function handleMessage(message) {
     userSaid += content.inputTranscription.text;
     taint.clear(); // the user's own words
     lastHeardAt = Date.now();
+    deaf?.heard();
   }
   if (content.outputTranscription?.text && !(listenOnly && !announcing)) irisSaid += content.outputTranscription.text; // dropped words were never heard
   if (content.turnComplete) endTurn();
@@ -400,10 +405,14 @@ function stopLive() {
 let clearing = false;
 async function clearContext() {
   history.length = 0; // ↺ starts a fresh conversation, so the chat window starts empty too
+  return renewSession("clear");
+}
+// kind: "clear" (↺) or "deaf" (onDeaf); the deaf retry keeps the chat window.
+async function renewSession(kind) {
   if (!session || clearing) return;
   clearing = true;
-  log("INFO", "live", "clear requested");
-  perfConnect = { t: Date.now(), kind: "clear" };
+  log("INFO", "live", `${kind} requested`);
+  perfConnect = { t: Date.now(), kind };
   const old = session;
   hooks?.killLate(); // their results belong to the conversation ↺ just dropped
   convo++;
@@ -419,14 +428,14 @@ async function clearContext() {
   try {
     session = await freshSession(resumer, old); // null when Stop came during the connect: start() closed it
   } catch (e) {
-    log("ERROR", "live", `clear: ${e?.message || e}`);
+    log("ERROR", "live", `${kind}: ${e?.message || e}`);
     endSession({ reason: e?.message || String(e) });
   } finally {
     clearing = false;
   }
   if (!session) return;
   // The new session does not know: say it silently, as after a reconnect.
-  if (listenOnly) try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: "[session] Listen mode is ON: keep listening, do not reply, do not speak and do not call any tool until it ends." }] }], turnComplete: false }); } catch (e) { log("ERROR", "live", `clear: listen note: ${e?.message || e}`); }
+  if (listenOnly) try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: "[session] Listen mode is ON: keep listening, do not reply, do not speak and do not call any tool until it ends." }] }], turnComplete: false }); } catch (e) { log("ERROR", "live", `${kind}: listen note: ${e?.message || e}`); }
   if (looking) tellLooking();
 }
 function setMuted(on) {
@@ -634,7 +643,16 @@ ipcMain.on("live:audio-in", (_e, arrayBuffer) => {
       audio: { data: buf.toString("base64"), mimeType: "audio/pcm;rate=16000" },
     });
   } catch (e) { log("ERROR", "live", `audio-in: ${e?.message || e}`); }
+  const voiced = deaf?.feed(buf.length, rms, now);
+  if (voiced) onDeaf(voiced);
 });
+// A deaf session never wakes up: start a fresh one, at most 2 times per Start. The model stays the user's pick.
+function onDeaf(ms) {
+  deafTries++;
+  log("WARN", "live", `deaf session: ${(ms / 1000).toFixed(1)}s voice, no transcript, model=${meter.model} plugins=${livePlugins} try=${deafTries}`);
+  if (deafTries <= 2) return void renewSession("deaf");
+  if (deafTries === 3) send("live:log", readConfig().lang === "en" ? "error: Gemini cannot hear you in this session. Try the 3.1 model in Settings." : "error: Gemini không nghe được bạn trong phiên này. Hãy thử mô hình 3.1 trong Thiết lập.");
+}
 
 // Gallery View feature: a folder browser full screen in the overlay (gesture/hud-ui.js). Every entry is a card: images show
 // the picture, folders open inside, other files open in their macOS app. Only the viewed image's path goes to Gemini, never pixels.

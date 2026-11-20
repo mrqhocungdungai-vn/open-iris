@@ -29,6 +29,25 @@ export function micMeter(windowMs = 5000, warnMs = 30000) {
   };
 }
 
+// "Deaf session" (docs/plugin-framework-plan.md L1): Gemini sometimes opens a session that never transcribes the mic.
+// One watch per connection. feed(bytes, rms, now) per mic chunk returns the voiced ms once, when it fires, else 0;
+// heard() at the first inputTranscription turns it off for good.
+// shortcut: 4 s of voice over >= 10 s are guesses from 8 spike sessions; tune them from real deaf lines in main.log.
+export function deafWatch(voiceMs = 4000, waitMs = 10000) {
+  let voiced = 0, first = 0, done = false;
+  return {
+    feed(bytes, rms, now) {
+      if (done || rms <= VOICE_RMS) return 0;
+      if (!first) first = now;
+      voiced += bytes / 32; // 16 kHz 16-bit mono: 32 bytes per ms
+      if (voiced < voiceMs || now - first < waitMs) return 0;
+      done = true;
+      return voiced;
+    },
+    heard() { done = true; },
+  };
+}
+
 // Nearest-rank percentile, p in 0..100.
 export function pct(values, p) {
   if (!values.length) return NaN;
