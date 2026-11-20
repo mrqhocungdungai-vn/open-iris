@@ -1,7 +1,7 @@
 // node live-config.selftest.mjs — keyFormatOk accepts both Gemini key styles and rejects junk; the instruction has no coding text. Keys below are fake.
 import assert from "node:assert/strict";
 import { desktopTools } from "./desktop.mjs";
-import { keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
+import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 
 assert.ok(keyFormatOk("AIzaSyFAKEfake0000000000000000000_-abcd"), "classic AIza key");
 assert.ok(keyFormatOk("AQ.FakeFakeFake0000000000000000000000000"), "newer AQ. key with a dot");
@@ -18,6 +18,16 @@ assert.ok(!text.includes("Claude Code"), "no Claude Code");
 
 // Giữ phiên dài: off adds nothing; on asks for handles and compression; a handle resumes that session.
 const tools = desktopTools();
+// Capabilities: the prompt only points at list_my_abilities when it is on; the tool output is built from the switches.
+assert.ok(!text.includes("list_my_abilities") && text.includes("say so in one short sentence instead of guessing"), "no abilities tool: no pointer, still the can't rule");
+const ab = abilitiesTool([...tools.slice(0, 2), { name: "use_skill", description: "Load a guide. Call it first." }], ["press_key_combo", "click_app_control"]);
+assert.equal(ab.name, ABILITIES);
+assert.ok(liveSetup("vi", [...tools, ab]).systemInstruction.parts[0].text.includes("call list_my_abilities first"), "pointer when on");
+const abOut = (await ab.run()).output;
+assert.ok(abOut.includes("Say all 3 tools") && abOut.includes("1. list_running_apps: List running GUI applications.") && abOut.includes("3. use_skill: Load a guide.") && !abOut.includes("Call it first"), "one line per tool, first sentence only");
+assert.ok(abOut.includes("Switched off in Settings (the user can turn them on): press_key_combo, click_app_control.") && abOut.includes("Hand control") && abOut.includes("Gallery View"), "off list, hand, gallery");
+assert.ok(!(await abilitiesTool([]).run()).output.includes("Switched off"), "nothing off: no off line");
+assert.ok(!text.includes("Switched off") && liveSetup("vi", [], "", { off: ["press_key_combo"] }).systemInstruction.parts[0].text.includes("Switched off in Settings now: press_key_combo."), "off list in the prompt only when something is off");
 const off = liveSetup("vi", tools);
 assert.ok(!("sessionResumption" in off) && !("contextWindowCompression" in off), "keep off: no resume keys");
 const on = liveSetup("vi", tools, "", { keep: true });

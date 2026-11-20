@@ -12,13 +12,13 @@ import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
 import { pushLine } from "../gesture/talk.js";
 import { TOOL_DEFAULTS, cleanTools, desktopTools } from "./desktop.mjs";
-import { keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
+import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput } from "./input.mjs";
 import { createResumer, freshSession, resumeNote } from "./resume.mjs";
 import { ago, rms16, VOICE_RMS } from "./perf.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
-import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
+import { cleanName, cleanSkills, greeting, nameFor, loadPersona, loadSkills, personaBrief, savePersona, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
 import { cleanPluginConfig, createHooks, createTaint, deliverLate, killCommands, loadPlugins, NAME, trustHash } from "./hooks.mjs";
 import { pluginEntry } from "./plugin-list.mjs";
@@ -50,7 +50,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, welcomed: c?.welcomed === true });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, name: cleanName(c?.name), greet: c?.greet !== false, abilities: c?.abilities !== false, welcomed: c?.welcomed === true });
 // tmp + rename: a crash mid-write must not leave half a file, which readConfig would turn into defaults
 const writeConfig = (c) => (fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(clean(c), null, 2) + "\n"), fs.renameSync(`${configFile}.tmp`, configFile));
 function readConfig() {
@@ -122,9 +122,11 @@ async function startLive(opts) {
 
 async function connectLive(opts) {
   perfConnect = { t: Date.now(), kind: "start" };
+  lastVoiceAt = lastHeardAt = 0; // V1 of the greeting must not count from the last session's voice
   const { lang, model, voice, tools, skills: skillOn } = clean(opts);
   const saved = readConfig(), keep = saved.session.keep;
-  writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn } }); // keeps the switches of skills not listed now
+  const abilities = typeof opts?.tools?.[ABILITIES] === "boolean" ? opts.tools[ABILITIES] : saved.abilities; // its switch sits with the tool switches
+  writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn }, abilities }); // keeps the switches of skills not listed now
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     log("ERROR", "live", `GEMINI_API_KEY is not set (${envFile})`);
@@ -156,7 +158,9 @@ async function connectLive(opts) {
   startTainted = !!start.tainted;
   if (startTainted) taint.mark();
   enabledTools = enabledTools.concat(hooks.tools()); // plugin command tools (spec §12): fixed for this session, like the desktop switches
-  const brief = personaBrief(loadOwner(home), skills) + (start.context ? ` ${start.context}` : "");
+  const off = Object.keys(TOOL_DEFAULTS).filter((n) => !tools[n]).concat(hooks.offTools());
+  if (abilities) enabledTools = enabledTools.concat(abilitiesTool(enabledTools, off));
+  const brief = personaBrief(loadPersona(home), skills, nameFor(saved.name, lang)) + (start.context ? ` ${start.context}` : "");
   log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} plugins=${plugins.filter((p) => !p.error && saved.plugins[p.name]?.on).map((p) => p.name).join(",") || "none"}`);
   chunksIn = 0;
   chunksOut = 0;
@@ -173,7 +177,7 @@ async function connectLive(opts) {
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
         inputAudioTranscription: {},
         outputAudioTranscription: {},
-        ...liveSetup(lang, enabledTools, brief, { keep, handle, model, off: Object.keys(TOOL_DEFAULTS).filter((n) => !tools[n]) }),
+        ...liveSetup(lang, enabledTools, brief, { keep, handle, model, off }),
       },
       callbacks: {
         onopen: () => {
@@ -221,6 +225,9 @@ async function connectLive(opts) {
     log: (level, m) => log(level, "live", m),
   });
   session = await resumer.start();
+  // Once per Start, here and not in onopen: session is set only now, and a reconnect never comes back through this line.
+  const hello = greeting({ on: saved.greet, listenOnly, name: nameFor(saved.name, lang) });
+  if (hello) try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: hello }] }], turnComplete: true }); } catch (e) { log("ERROR", "live", `greeting: ${e?.message || e}`); }
   if (looking) tellLooking(); // an image was already open before Iris started
 }
 
@@ -444,8 +451,8 @@ function endAnnounce() {
   announcing = null;
 }
 
-ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, owner: loadOwner(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })), plugins: loadPlugins(home) } }));
-ipcMain.handle("owner:set", (_e, text) => saveOwner(home, text));
+ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, persona: loadPersona(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })), plugins: loadPlugins(home) } }));
+ipcMain.handle("persona:set", (_e, text) => savePersona(home, text));
 ipcMain.handle("skills:open", () => {
   const dir = path.join(home, "skills");
   fs.mkdirSync(dir, { recursive: true });
@@ -565,6 +572,8 @@ ipcMain.handle("config:mic", (_e, mic) => {
 ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, keep: on !== false } })); // clean() keeps only a boolean
 ipcMain.handle("config:compose", (_e, on) => writeConfig({ ...readConfig(), compose: on !== false }));
 ipcMain.handle("config:meter", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, meter: on !== false } }));
+ipcMain.handle("config:name", (_e, name) => writeConfig({ ...readConfig(), name })); // clean() keeps one short plain line
+ipcMain.handle("config:greet", (_e, on) => writeConfig({ ...readConfig(), greet: on !== false }));
 ipcMain.handle("config:welcomed", () => writeConfig({ ...readConfig(), welcomed: true }));
 // Welcome wizard: check the key against Gemini, then keep it in ~/.open-iris/.env (0600). Returns "" or an error text.
 ipcMain.handle("key:save", async (_e, key) => {

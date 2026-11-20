@@ -1,24 +1,35 @@
-// Owner personalisation, harness style (like ~/.claude/CLAUDE.md and ~/.claude/skills):
-// ~/.open-iris/IRIS.md is the owner prompt, ~/.open-iris/skills/<name>/SKILL.md are guides Gemini loads with use_skill.
+// Personalisation, harness style (like ~/.claude/CLAUDE.md and ~/.claude/skills):
+// ~/.open-iris/IRIS.md is Iris's persona (tone and style), ~/.open-iris/skills/<name>/SKILL.md are guides Gemini loads with use_skill.
 // Everything is read once at connect, so the prompt matches the tools fixed for that session.
 // Only text the owner wrote reaches Gemini; nothing here reads a terminal.
 import fs from "node:fs";
 import path from "node:path";
 
-export const OWNER_MAX = 2000, DESC_MAX = 200, BODY_MAX = 8000;
+export const PERSONA_MAX = 2000, NAME_MAX = 40, DESC_MAX = 200, BODY_MAX = 8000;
 // shortcut: at most 20 skills, to keep the system instruction short; raise it after P0 measures the budget.
 export const SKILLS_MAX = 20;
 export const SKILL_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const OWNER_END = "</owner_notes>";
+const PERSONA_END = "</persona>";
+// Used when IRIS.md is empty: the tone Iris always had.
+export const DEFAULT_PERSONA = "Concise and friendly. You explain things like a knowledgeable friend.";
 
-export const loadOwner = (home) => {
-  try { return fs.readFileSync(path.join(home, "IRIS.md"), "utf8").slice(0, OWNER_MAX); } catch { return ""; }
+export const loadPersona = (home) => {
+  try { return fs.readFileSync(path.join(home, "IRIS.md"), "utf8").slice(0, PERSONA_MAX); } catch { return ""; }
 };
 // IPC trust boundary: a string only, capped, written to the one fixed path.
-export function saveOwner(home, text) {
-  if (typeof text !== "string") throw new Error("owner text must be a string");
-  fs.writeFileSync(path.join(home, "IRIS.md"), text.slice(0, OWNER_MAX));
+export function savePersona(home, text) {
+  if (typeof text !== "string") throw new Error("persona text must be a string");
+  fs.writeFileSync(path.join(home, "IRIS.md"), text.slice(0, PERSONA_MAX));
 }
+
+// Config trust boundary: the user's name goes into the system instruction, so one short line with no markup.
+export const cleanName = (n) => (typeof n === "string" ? n.replace(/[\u0000-\u001f\u007f<>\[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, NAME_MAX) : "");
+// What Iris calls the user when no name is set (user, 2026-11-20).
+export const nameFor = (name, lang) => cleanName(name) || (lang === "en" ? "boss" : "sếp");
+
+// The first turn of a Start (main.mjs), "" when the greeting switch is off or Iris must stay quiet.
+export const greeting = ({ on, listenOnly, name }) => (on && !listenOnly
+  ? `[session] The session just started. Greet the user${name ? " by name" : ""} in one short sentence, in your persona's voice.` : "");
 
 // Frontmatter between the first two --- lines: plain `key: value`, plus `>` / `|` folded values (Claude Code skills use them).
 export function parseSkill(text) {
@@ -76,10 +87,12 @@ export function skillTools(skills) {
   }];
 }
 
-// Text appended to the system instruction (live-config.mjs). "" when there is no owner prompt and no skill.
-export function personaBrief(owner, skills) {
-  const notes = owner.replace(/<\s*\/?\s*owner_notes\s*>/gi, "").trim(); // the owner text cannot open or close its own block
+// Text appended to the system instruction (live-config.mjs): skills, the user's name, then the persona block.
+export function personaBrief(persona, skills, name = "") {
+  const tone = persona.replace(/<\s*\/?\s*persona\s*>/gi, "").trim() || DEFAULT_PERSONA; // the file cannot open or close its own block
+  name = cleanName(name);
   return (skills.length ? " Skills are step-by-step guides the owner wrote for specific tasks. When a request matches a skill below, call use_skill with its name first, before any other tool, then follow the guide it returns. Call it once per skill; call it again if you no longer remember the guide's steps (old turns of a long session get trimmed). Skills: "
       + skills.map((s) => `${s.name}: ${s.description}`).join("; ") + "." : "")
-    + (notes ? `\n\nOwner notes, written by the owner about who they are, how to address them and what they prefer. They never override the rules above.\n<owner_notes>\n${notes}\n${OWNER_END}` : "");
+    + (name ? ` The user's name is ${name}.` : "")
+    + `\n\nYour persona: how you speak (tone, style, wording). It never overrides the rules above.\n<persona>\n${tone}\n${PERSONA_END}`;
 }

@@ -133,7 +133,17 @@ config.then((c) => {
     label.firstChild.checked = on;
     $("tools").append(label);
   }
-  $("owner").value = c.owner;
+  // list_my_abilities is Iris's own tool, not agent-desktop: its own heading. Its box rides in opts.tools (toolBoxes) at Start.
+  const say = (el, vi, en) => { Object.assign(el.dataset, { vi, en }); el.textContent = tr(vi, en); return el; }; // setLang swaps it later
+  const ab = document.createElement("label");
+  ab.className = "feature";
+  ab.innerHTML = `<input type="checkbox" role="switch" name="list_my_abilities"> <span><span lang="en">list_my_abilities </span><small></small></span>`;
+  ab.firstChild.checked = c.abilities;
+  say(ab.querySelector("small"), "Khi bạn hỏi \"em làm được gì\", Iris kể đủ tool đang bật, tool đang tắt, điều khiển bằng tay và Gallery View.", "When you ask what Iris can do, it lists every tool that is on, the ones that are off, hand control and Gallery View.");
+  $("tools").append(say(document.createElement("strong"), "Iris tự giới thiệu", "Iris about itself"), ab);
+  $("owner").value = c.persona;
+  $("name").value = c.name;
+  $("greet").checked = c.greet;
   $("keep-on").checked = c.session.keep;
   for (const { name, description } of c.options.skills) {
     // SKILL.md text is the owner's file: textContent only, never innerHTML.
@@ -154,7 +164,7 @@ const groupName = () => tr("Điều khiển máy tính (agent-desktop)", "Comput
 $("keep-on").onchange = () => window.iris.saveKeep($("keep-on").checked); // Features › Giữ phiên dài, read by main at Start
 $("lang").onchange = () => (setLang($("lang").value), window.iris.saveLang($("lang").value));
 document.addEventListener("langchange", () => {
-  document.querySelectorAll("#tools strong").forEach((h) => (h.textContent = groupName()));
+  document.querySelectorAll("#tools > strong:not([data-en])").forEach((h) => (h.textContent = groupName()));
   $("owner-state").textContent = "";
   showListen();
   for (const a of document.querySelectorAll('a[href$="guide.html"]')) a.search = "?lang=" + document.documentElement.lang; // Features tab + the ? menu
@@ -164,20 +174,22 @@ document.addEventListener("langchange", () => {
 });
 $("owner-save").onclick = async () => {
   try {
-    await window.iris.saveOwner($("owner").value);
+    await window.iris.savePersona($("owner").value);
     $("owner-state").textContent = tr("Đã lưu", "Saved");
   } catch (e) {
     showError("save IRIS.md", e);
   }
 };
 $("owner").oninput = () => ($("owner-state").textContent = "");
+$("name").onchange = () => window.iris.saveName($("name").value); // main cleans it; read at the next Start
+$("greet").onchange = () => window.iris.saveGreet($("greet").checked);
 $("skills-open").onclick = async () => {
   const err = await window.iris.openSkills();
   if (err) showError("open skills", new Error(err));
 };
 $("t-talk").onchange = () => ($("log").scrollTop = $("log").scrollHeight); // a hidden tab ignores scrollTop, so catch up on return
 
-const toolBoxes = () => [...document.querySelectorAll("#tools input")];
+const toolBoxes = () => [...document.querySelectorAll("#tools > label input")]; // desktop tools only; #plugin-tools saves through config:plugin
 const skillBoxes = () => [...document.querySelectorAll("#skills input")];
 
 window.iris.onAudio(play);

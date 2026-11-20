@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, label, needsTrust, runsCommands, trustState } from "./plugins-view.mjs";
+import { clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, label, needsTrust, runsCommands, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
 
 const plugin = (over = {}) => ({
   name: "block-bank", on: false, fields: [{ key: "topic", max: 5 }],
@@ -57,6 +57,40 @@ test("patches match the savePlugin contract", () => {
   const p = plugin();
   assert.deepEqual(groupPatch(p, p.groups[0], { every_min: 5 }), { name: "block-bank", groups: { say: { every_min: 5 } } });
   assert.deepEqual(fieldPatch(p, p.fields[0], "abcdefgh"), { name: "block-bank", fields: { topic: "abcde" } });
+});
+
+test("command tools count for runsCommands and needsTrust", () => {
+  const p = plugin({ on: true, tools: [{ name: "start_job", on: false }] });
+  assert.equal(needsTrust(p, { tool: "start_job", on: true }), true); // first tool on, untrusted: ask
+  assert.equal(needsTrust(p, { tool: "start_job", on: false }), false);
+  assert.equal(needsTrust({ ...p, trust: { approved: true } }, { tool: "start_job", on: true }), false);
+  assert.equal(needsTrust({ ...p, on: false }, { tool: "start_job", on: true }), false); // plugin off: asked when it is turned on
+  const off = plugin({ tools: [{ name: "start_job", on: true }] });
+  assert.equal(needsTrust(off, { on: true }), true); // plugin on with a tool already on
+  assert.equal(runsCommands(off, { on: true }), true);
+});
+
+test("toolsLine counts tools and on, plural only in English", () => {
+  assert.equal(toolsLine("vi", plugin()), null);
+  assert.equal(toolsLine("en", plugin({ tools: [] })), null);
+  const one = plugin({ tools: [{ name: "a", on: false }] });
+  assert.deepEqual(toolsLine("en", one), { none: true, text: "1 tool · 0 on", link: "Turn on in Agent Tools →" });
+  const three = plugin({ tools: [{ name: "a", on: true }, { name: "b", on: false }, { name: "c", on: false }] });
+  assert.deepEqual(toolsLine("vi", three), { none: false, text: "3 tool · 1 đang bật", link: "Bật ở Agent Tools →" });
+  assert.equal(toolsLine("en", three).text, "3 tools · 1 on");
+});
+
+test("toolsState: off wins, then never trusted vs changed", () => {
+  assert.equal(toolsState(plugin()), "off");
+  assert.equal(toolsState(plugin({ trust: { approved: false, changed: true } })), "off");
+  assert.equal(toolsState(plugin({ on: true })), "new");
+  assert.equal(toolsState(plugin({ on: true, trust: { approved: false, changed: true } })), "changed");
+  assert.equal(toolsState(plugin({ on: true, trust: { approved: true } })), "ok");
+  assert.equal(toolsState(plugin({ on: true, trust: null })), "ok");
+});
+
+test("toolPatch matches config:plugin { name, tools: { [tool]: { on } } }", () => {
+  assert.deepEqual(toolPatch(plugin(), { name: "start_job" }, true), { name: "block-bank", tools: { start_job: { on: true } } });
 });
 
 test("hearsSpeech only for UserTurn/IrisTurn commands", () => {

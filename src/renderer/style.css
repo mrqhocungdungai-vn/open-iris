@@ -64,7 +64,7 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 
 /* Agent Tools (rows built by renderer.js) and Features: a checkbox styled as an on/off switch (role="switch" keeps it accessible). */
 #tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
-#tools small, #tools strong { grid-column: 1 / -1; }
+#tools small, #tools strong, #tools > .feature { grid-column: 1 / -1; }
 #tools strong { margin-top: 12px; font-weight: 500; color: var(--text-2); }
 #tools label, .feature { display: flex; align-items: center; gap: 8px; min-height: 36px; min-width: 0; overflow-wrap: anywhere; }
 .feature { min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--hair); font-weight: 500; }
@@ -75,6 +75,21 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 [role=switch]:checked::after { transform: translateX(16px); }
 [role=switch]:disabled { background: var(--hair); cursor: not-allowed; }
 :is(#tools label, .feature):has(:disabled) { color: var(--muted); }
+/* Plugin command tools (plugins-ui.js), after the desktop tools: one group per plugin. */
+#tools #plugin-tools, #tools .pgroup { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; }
+#tools #plugin-tools { order: 1; } /* renderer.js appends the desktop rows later */
+#tools .pgroup > strong { display: flex; align-items: center; gap: 8px; }
+#tools .pgroup .why { margin: -2px 0 2px; }
+#tools .pgroup.dim > label { opacity: 0.55; } /* off or untrusted: still clickable, like the Plugin tab */
+#tools .pgroup label { align-items: flex-start; padding: 8px 0; }
+#tools .pgroup label > [role=switch] { margin-top: 1px; }
+#tools .pgroup label > span { display: grid; gap: 2px; min-width: 0; }
+#tools .pgroup .id { font: 11px ui-monospace, monospace; color: var(--muted); }
+#tools .pgroup .ev { justify-self: start; }
+#tools .pgroup .ev.need { background: var(--error-bg); }
+#tools .pgroup { scroll-margin-top: 16px; border-radius: 8px; }
+#tools .pgroup.flash { animation: pgroup-flash 1.8s ease-out; } /* arriving from the plugin card's tool strip */
+@keyframes pgroup-flash { from { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent); } }
 @media (prefers-reduced-motion: reduce) { [role=switch], [role=switch]::after { transition: none; } }
 
 /* ⚙ Quyền macOS (rows built by gesture/setup.js): name, state, button; what it is for on the next line. */
@@ -85,6 +100,7 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 .perm .state { padding: 0 8px; border-radius: 999px; background: var(--hair); font-size: 12px; }
 .perm.granted .state { background: var(--ok-bg); }
 .perm.denied .state { background: var(--bad-bg); }
+#name { width: 100%; min-width: 0; min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
 #owner { width: 100%; min-height: 120px; margin-top: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
 #skills { display: grid; }
 .perm-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 0; }
@@ -229,3 +245,8 @@ dialog::backdrop { background: rgb(0 0 0 / 0.45); overflow: hidden; overscroll-b
 #plug-pick .pick { display: flex; gap: 8px; align-items: baseline; min-height: 36px; padding: 6px 0; border-bottom: 1px solid var(--hair); overflow-wrap: anywhere; }
 #plug-pick .pick.bad { color: var(--muted); }
 .plugin > .perm-actions { padding-bottom: 0; }
+/* Under the plugin name: how many command tools, and the way to Settings › Agent Tools. Tinted when none is on. */
+.plugin .ptools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; padding: 6px 10px; border-radius: 8px; background: var(--card-2); font-size: 13px; }
+.plugin .ptools a { margin-left: auto; color: var(--cta); font-weight: 500; text-decoration: none; }
+.plugin .ptools a:hover { text-decoration: underline; }
+.plugin .ptools.none { background: color-mix(in srgb, var(--accent) 12%, var(--card)); }

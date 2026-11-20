@@ -1,6 +1,6 @@
 // Plugin tab (4th tab): one card per plugin from main's plugins:list. Hooks only this round (no skills, tools, gestures).
 // main validates every patch; on/off and every_min apply at the next Start, fields at once.
-import { clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, kindLabel, label, needsTrust, pluginPatch, t, trustState } from "./plugins-view.mjs";
+import { clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, kindLabel, label, needsTrust, pluginPatch, t, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
 
 const $ = (id) => document.getElementById(id);
 const lang = () => document.documentElement.lang;
@@ -115,6 +115,7 @@ function card(p) {
   return h("div", { className: "plugin" },
     h("label", { className: "feature" }, sw(p.on, (e) => turn(p, { on: e.target.checked }, pluginPatch(p, e.target.checked)), p.name), " ",
       h("span", {}, h("span", { lang: "en", textContent: p.name }), " ", h("small", { textContent: [p.version, p.description].filter(Boolean).join(" · ") }))),
+    toolsStrip(p),
     ...p.fields.map((f) =>
       h("label", { className: "row" }, h("span", { textContent: label(lang(), f) }),
         h("input", { type: "text", maxLength: f.max || 500, value: f.value ?? "", placeholder: f.hint ?? "", onchange: (e) => save(fieldPatch(p, f, e.target.value)) }))),
@@ -127,7 +128,51 @@ function card(p) {
   );
 }
 
+// Settings › Agent Tools: one group per plugin with command tools. Off or untrusted: dimmed but still clickable (like the cards).
+const TOOLS_WHY = {
+  off: ["tắt", "off", "Plugin đang tắt nên Iris không có các tool này. Bật ở tab", "The plugin is off, so Iris does not get these tools. Turn it on in the"],
+  new: ["chưa tin cậy", "not trusted", "Plugin chưa được tin cậy nên Iris không có các tool này. Xem và tin cậy ở tab", "The plugin is not trusted yet, so Iris does not get these tools. Review and trust it in the"],
+  changed: ["chưa tin cậy", "not trusted", "File của plugin đã đổi từ lần bạn tin cậy, nên Iris không có các tool này. Xem lại và tin cậy lại ở tab", "The plugin's files changed since you trusted it, so Iris does not get these tools. Review and trust it again in the"],
+};
+const pill = (vi, en) => h("span", { className: "ev", textContent: tr(vi, en) });
+
+function toolGroup(p) {
+  const state = toolsState(p);
+  const why = TOOLS_WHY[state];
+  const el = h("div", { className: `pgroup${why ? " dim" : ""}` },
+    h("strong", {}, h("span", { lang: "en", textContent: p.name }), why && h("span", { className: `ev${state === "off" ? "" : " need"}`, textContent: tr(why[0], why[1]) })),
+    why && h("small", { className: "why" }, tr(why[2], why[3]) + " ",
+      h("a", { href: "#", lang: "en", textContent: "Plugin", onclick: (e) => (e.preventDefault(), $("t-plug").click()) }), "."),
+    ...p.tools.map((tool) =>
+      h("label", {}, sw(tool.on, (e) => turn(p, { tool: tool.name, on: e.target.checked }, toolPatch(p, tool, e.target.checked)), label(lang(), tool)),
+        h("span", {}, h("span", { textContent: label(lang(), tool) }), h("span", { className: "id", lang: "en", textContent: `${p.name}__${tool.name}` }),
+          tool.late && pill("kết quả đến sau", "result comes later"),
+          tool.confirm && pill("hỏi lại trước khi chạy", "asks before running")))),
+  );
+  el.dataset.plugin = p.name; // the card strip finds its group by this
+  return el;
+}
+
+// Card strip → Settings › Agent Tools: switch tab, rebuild, then scroll to the plugin's group and flash it.
+async function jumpToTools(p) {
+  $("t-set").checked = true; // no change event: that would start a second load()
+  await load();
+  const g = [...$("plugin-tools").children].find((x) => x.dataset.plugin === p.name);
+  if (!g) return;
+  g.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  g.classList.add("flash");
+  g.addEventListener("animationend", () => g.classList.remove("flash"), { once: true });
+  g.querySelector("input")?.focus({ preventScroll: true });
+}
+
+function toolsStrip(p) {
+  const line = toolsLine(lang(), p);
+  return line && h("div", { className: `ptools${line.none ? " none" : ""}` }, h("span", { textContent: line.text }),
+    h("a", { href: "#", textContent: line.link, onclick: (e) => (e.preventDefault(), jumpToTools(p)) }));
+}
+
 function render() {
+  $("plugin-tools").replaceChildren(...plugins.filter((p) => !p.error && p.tools?.length).map(toolGroup));
   $("plugins").replaceChildren(
     ...(plugins.length ? plugins.map(card) : [h("p", { className: "more" }, h("small", { textContent: tr("Chưa có plugin nào.", "No plugins yet.") }))]),
   );
@@ -207,5 +252,6 @@ $("plug-url").onsubmit = (e) => {
 };
 // main rebuilds the list on every call: reload when the tab opens, so a newly copied folder shows up.
 $("t-plug").addEventListener("change", load);
+$("t-set").addEventListener("change", load); // Agent Tools shows plugin tools: pick up a trust or on/off done in the Plugin tab
 document.addEventListener("langchange", render);
 load();

@@ -73,6 +73,13 @@ Gallery View chưa mở cho plugin.
    - **Kết quả `late` không mất khi nối lại hay ↺:** gửi vào phiên mới thành một lượt text của client.
    - **Cho chạy O3**, test thật với session Orca.
 5. Đã chốt (2026-11-20, user), sau lần quét bảo mật của tool plugin: sửa cả 5 lỗi (2 trung bình, 3 thấp, `ops-logs/security/2026-11-20/REPORT.md`). Khi cờ tainted bật, **giữ mọi tool của plugin**, không chỉ tool có `confirm`. Hộp thoại tin cậy hiện tên từng tool.
+6. Đã chốt (2026-11-20, user), K5: công tắc tool của plugin nằm trong **Agent Tools**, mỗi plugin một nhóm có tiêu đề, không nằm trong thẻ plugin. Làm bản xem trước HTML trước. Trong lúc chờ, cho phép sửa tay `config.json` để test O3. Bản xem trước đã duyệt (2026-11-20, user):
+   - Plugin tắt hoặc chưa tin cậy: công tắc tool làm mờ nhưng vẫn bấm được.
+   - Mỗi tool hiện tên đầy đủ `<plugin>__<tên>` bằng chữ nhỏ.
+   - Chưa tin cậy có hai câu báo riêng: "chưa từng tin cậy" và "file đã đổi từ lần bạn tin cậy".
+   - Nhãn `confirm` chỉ để đọc, user không tắt được.
+   - Thêm (2026-11-20, user): thẻ plugin ở tab Plugin có dòng "N tool · M đang bật — Bật ở Agent Tools →". Bấm vào thì chuyển tới nhóm tool của plugin đó, để cài xong là biết tool nằm ở đâu và đang tắt. Bản xem trước đã duyệt (2026-11-20, user): dòng luôn nằm ngay dưới tên plugin, nền xanh nhạt khi chưa bật tool nào, tiếng Anh chia số ít/số nhiều ("1 tool", "2 tools").
+   - Thêm (2026-11-20, user): plugin chỉ có tool, không có hook `command`, vẫn phải qua cổng tin cậy. Lõi **hỏi tin cậy khi user bật tool đầu tiên** của plugin chưa tin cậy, dùng hộp thoại có tên từng tool. User từ chối thì công tắc trở về tắt và không lưu gì.
 
 ## Liên quan
 

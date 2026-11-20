@@ -11,7 +11,9 @@ contextBridge.exposeInMainWorld("iris", {
   saveMeter: (on) => ipcRenderer.invoke("config:meter", on), // Features › Hiện mức context → config.session.meter
   saveCompose: (on) => ipcRenderer.invoke("config:compose", on), // Features › Gõ chữ, gửi ảnh và tệp → config.compose
   saveMic: (mic) => ipcRenderer.invoke("config:mic", mic), // { id, label } or null = system default
-  saveOwner: (text) => ipcRenderer.invoke("owner:set", text), // ~/.open-iris/IRIS.md
+  savePersona: (text) => ipcRenderer.invoke("persona:set", text), // ~/.open-iris/IRIS.md, Iris's tone
+  saveName: (name) => ipcRenderer.invoke("config:name", name), // what Iris calls the user → config.name
+  saveGreet: (on) => ipcRenderer.invoke("config:greet", on), // Iris greets at Start → config.greet
   openSkills: () => ipcRenderer.invoke("skills:open"), // "" or an error text
   openPlugins: () => ipcRenderer.invoke("plugins:open"), // ~/.open-iris/plugins; "" or an error text
   scanPluginFolder: () => ipcRenderer.invoke("plugins:scan-folder"), // folder picker → { source, plugins } or { canceled }

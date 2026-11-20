@@ -41,11 +41,19 @@
   <p class="more"><small data-en="The mic is for the voice, the camera for hand control. Changes apply at once.">Micro dùng cho giọng nói, camera dùng cho điều khiển bằng tay. Đổi là có hiệu lực ngay.</small></p>
   <div class="perm-actions"><button id="welcome-open" data-en="Check setup">Kiểm tra cài đặt</button> <small data-en="Key, permissions, tools on this Mac">Key, quyền, công cụ trên máy</small></div>
   <h2 lang="en">Agent Tools</h2>
-  <fieldset id="tools"><small data-en="Changes take effect at the next Start.">Thay đổi có hiệu lực từ lần Bắt đầu kế tiếp.</small></fieldset>
-  <!-- Owner prompt and skills (persona.mjs): read at connect, like the tool switches. -->
-  <h2 data-en="Owner">Chủ nhân</h2>
-  <p class="more"><small data-en="~/.open-iris/IRIS.md: who you are, what Iris calls you, your preferences. Sent to Gemini at every Start, so no passwords. Takes effect at the next Start.">~/.open-iris/IRIS.md: bạn là ai, Iris gọi bạn thế nào, sở thích. Gửi cho Gemini mỗi lần Bắt đầu, đừng ghi mật khẩu. Có hiệu lực từ lần Bắt đầu kế tiếp.</small></p>
-  <textarea id="owner" rows="6" maxlength="2000" aria-label="Lời dặn cho Iris (IRIS.md)" data-en-aria-label="Notes for Iris (IRIS.md)"></textarea>
+  <fieldset id="tools"><small data-en="Changes take effect at the next Start.">Thay đổi có hiệu lực từ lần Bắt đầu kế tiếp.</small><div id="plugin-tools"></div></fieldset>
+  <!-- Name, greeting and persona (persona.mjs): read at connect, like the tool switches. -->
+  <h2 data-en="Iris and you">Iris và bạn</h2>
+  <label class="row"><span data-en="Your name">Tên của bạn</span> <input id="name" type="text" maxlength="40" autocomplete="off" placeholder="Để trống: Iris gọi bạn là sếp" data-en-placeholder="Empty: Iris calls you boss" /></label>
+  <label class="feature"><input id="greet" type="checkbox" role="switch" /> <span><span data-en="Greet at Start">Chào khi Bắt đầu</span> <small data-en="Iris greets you by name, in the persona below">Iris chào bạn bằng tên, theo tính cách bên dưới</small></span></label>
+  <p class="more"><strong data-en="Iris's persona">Tính cách của Iris</strong><br><small data-en="~/.open-iris/IRIS.md: Iris's tone and style. Empty = concise and friendly. Your name and the persona are sent to Gemini at every Start, so no passwords; they take effect at the next Start. The tool and language rules do not change with the persona.">~/.open-iris/IRIS.md: giọng văn và phong cách của Iris. Để trống thì Iris nói ngắn gọn, thân thiện. Tên và tính cách được gửi cho Gemini mỗi lần Bắt đầu, đừng ghi mật khẩu; có hiệu lực từ lần Bắt đầu kế tiếp. Luật dùng công cụ và ngôn ngữ không đổi theo tính cách.</small></p>
+  <textarea id="owner" rows="6" maxlength="2000" aria-label="Tính cách của Iris (IRIS.md)" data-en-aria-label="Iris's persona (IRIS.md)" placeholder="Ví dụ:
+- Vui vẻ, hay đùa nhẹ, xưng em gọi anh.
+- Hoặc: nghiêm túc, chậm rãi, chọn chữ cẩn thận như một chính trị gia.
+- Hoặc: cộc lốc, chỉ nói điều cần nói." data-en-placeholder="For example:
+- Cheerful, light jokes.
+- Or: serious and measured, choosing words carefully like a politician.
+- Or: blunt, only what is needed."></textarea>
   <div class="perm-actions"><button id="owner-save" data-en="Save">Lưu</button> <small id="owner-state" role="status"></small></div>
   <h2 lang="en">Skills</h2>
   <fieldset id="skills"><small data-en="~/.open-iris/skills/&lt;name&gt;/SKILL.md (frontmatter name, description). Takes effect at the next Start; new skills show up after reopening the app.">~/.open-iris/skills/&lt;tên&gt;/SKILL.md (frontmatter name, description). Có hiệu lực từ lần Bắt đầu kế tiếp; skill mới hiện ra sau khi mở lại app.</small></fieldset>

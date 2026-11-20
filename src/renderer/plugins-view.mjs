@@ -25,10 +25,12 @@ export function clampEvery(value, fallback = 5) {
   return Number.isFinite(n) && String(value).trim() !== "" ? Math.min(60, Math.max(2, n)) : fallback;
 }
 
-// Would this plugin run a command after the change? change = { on } for the plugin or { group, on } for one group.
+// Would this plugin run a command after the change? change = { on } for the plugin, { group, on } for one group or { tool, on } for one tool.
+// Every plugin tool is a command tool (spec §12), so a tool that is on counts.
 export function runsCommands(p, change) {
-  const on = change.group ? p.on : change.on;
-  return !!on && p.groups.some((g) => (g.name === change.group ? change.on : g.on) && g.commands.length > 0);
+  const on = change.group || change.tool ? p.on : change.on;
+  return !!on && (p.groups.some((g) => (g.name === change.group ? change.on : g.on) && g.commands.length > 0) ||
+    (p.tools ?? []).some((t) => (t.name === change.tool ? change.on : t.on)));
 }
 
 // Turning something on that runs a command while the folder is not trusted: ask first (spec §6).
@@ -44,7 +46,23 @@ export function trustState(p) {
   return p.trust.changed ? "changed" : "new";
 }
 
+// Settings › Agent Tools: does Iris get this plugin's tools? "ok", "off" (plugin off), "new" or "changed" (not trusted). Spec §12.2.
+export function toolsState(p) {
+  if (!p.on) return "off";
+  const s = trustState(p);
+  return s === "new" || s === "changed" ? s : "ok";
+}
+
+// Plugin card strip: how many command tools and how many are on; null without tools. Plural only in English.
+export function toolsLine(lang, p) {
+  const n = p.tools?.length ?? 0;
+  if (!n) return null;
+  const m = p.tools.filter((x) => x.on).length;
+  return { none: m === 0, text: t(lang, `${n} tool · ${m} đang bật`, `${n} ${n === 1 ? "tool" : "tools"} · ${m} on`), link: t(lang, "Bật ở Agent Tools →", "Turn on in Agent Tools →") };
+}
+
 // savePlugin patches.
+export const toolPatch = (p, tool, on) => ({ name: p.name, tools: { [tool.name]: { on } } });
 export const pluginPatch = (p, on) => ({ name: p.name, on });
 export const groupPatch = (p, g, change) => ({ name: p.name, groups: { [g.name]: change } });
 export const fieldPatch = (p, f, value) => ({ name: p.name, fields: { [f.key]: String(value).slice(0, f.max || 500) } });
