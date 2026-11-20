@@ -98,11 +98,20 @@ function setControl(on) {
   log("INFO", "control", on ? "on" : "off");
   broadcast("control", on); // engine (main window) + HUD status
 }
+// [perf] H2 (docs/optimize-plan.md §2): CPU % per Electron process while vision runs. GPU % is not in getAppMetrics.
+let perfTimer = 0;
+function logMetrics() {
+  const names = new Map(BrowserWindow.getAllWindows().map((w) => [w.webContents.getOSProcessId(), w === win ? "hud" : w === pop ? "camera" : "main"]));
+  const parts = app.getAppMetrics().map((m) => `${names.get(m.pid) ?? m.type}=${m.cpu.percentCPUUsage.toFixed(1)}`);
+  log("INFO", "perf", `[perf] cpu% ${parts.join(" ")} hud=${win ? "on" : "off"} camera=${pop ? "open" : "closed"}`);
+}
 function setVision(on) {
   if (on === vision) return broadcast("vision", on); // still echo, so a switch that moved on its own settles back
   vision = on;
   log("INFO", "vision", on ? "on" : "off");
   if (!on) send("up 0 0"); // never leave the button held down
+  clearInterval(perfTimer);
+  perfTimer = on && setInterval(logMetrics, 5000);
   broadcast("vision", on);
   setControl(false); // every start (and stop) begins paused: 🤘 hold or ⌃⌥G activates
 }

@@ -4,6 +4,7 @@
 import { DrawingUtils, FilesetResolver, HandLandmarker } from "../../node_modules/@mediapipe/tasks-vision/vision_bundle.mjs";
 import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isThumbUp, palmsOf, LOCK_HOLD_MS, pinchApproach, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
 import { deviceConstraint } from "../renderer/devices.js";
+import { handPerfLine } from "./perf.js";
 
 const $ = (id) => document.getElementById(id);
 const MODEL = new URL("../../models/hand_landmarker.task", import.meta.url).href; // local copy: `pnpm fetch-model`
@@ -93,6 +94,9 @@ async function start() {
   showStatus();
   // setInterval, not requestAnimationFrame: rAF stops while other apps cover this window (backgroundThrottling is off).
   timer ||= setInterval(frame, 33);
+  perfAt = 0;
+  video.cancelVideoFrameCallback(camCb);
+  camCb = video.requestVideoFrameCallback(onCameraFrame);
 }
 
 async function openCamera() {
@@ -144,10 +148,38 @@ function tick(freq) {
   osc.stop(t + 0.05);
 }
 
+// [perf] (docs/optimize-plan.md §2): camera frames come from requestVideoFrameCallback, the rest from frame().
+const PERF_MS = 5000;
+const perfWindow = () => ({ cam: 0, ticks: 0, dup: 0, detect: [], lat: [], cur: [], raw: [] });
+let perf = perfWindow();
+let perfAt = 0;
+let frameAt = 0; // capture (or, without captureTime, presentation) time of the newest camera frame
+let frameSrc = "present";
+let lastMediaTime = -1;
+let camCb = 0;
+function onCameraFrame(now, meta) {
+  perf.cam++;
+  frameAt = meta.captureTime ?? now;
+  frameSrc = meta.captureTime ? "capture" : "present";
+  camCb = video.requestVideoFrameCallback(onCameraFrame);
+}
+function perfTick(t0, t1) {
+  perf.ticks++;
+  perf.detect.push(t1 - t0);
+  if (video.currentTime === lastMediaTime) perf.dup++; // the 33ms timer ran MediaPipe again on a frame it already saw
+  lastMediaTime = video.currentTime;
+  if (t1 - perfAt < PERF_MS) return;
+  if (perfAt) console.info(handPerfLine(perf, (t1 - perfAt) / 1000, screen.width, frameSrc));
+  perf = perfWindow();
+  perfAt = t1;
+}
+
 let palms = null;
 function frame() {
   if (video.readyState < 2) return;
-  const res = landmarker.detectForVideo(video, performance.now());
+  const t0 = performance.now();
+  const res = landmarker.detectForVideo(video, t0);
+  perfTick(t0, performance.now());
   const lm = res.landmarks[res.handedness.findIndex((h) => h[0]?.categoryName === LABEL[side])];
   // Both palms (mirrored like the screen), for the HUD gallery's two-hand zoom; null unless both hands are open ✋.
   palms = palmsOf(res.landmarks);
@@ -261,6 +293,10 @@ function frame() {
   anchor = clickLock(anchor, cursor, now);
   if (pinched && !held) anchor = { ...(anchor ?? cursor), until: Infinity }; // a 2nd pinch reuses the 1st point
   const at = anchor ?? cursor;
+  // H3 sample, ✋ frames only. Trackpad: raw is the hand point (span 1), not a screen point, so compare raw vs cursor only in absolute mode.
+  perf.lat.push(performance.now() - frameAt);
+  perf.cur.push({ x: cursor.x, y: cursor.y });
+  perf.raw.push(cursorFrom(lm, mode === "trackpad" ? 1 : span));
   if (control) {
     window.gesture.mouse("move", at.x, at.y);
     if (pinched !== held) {
