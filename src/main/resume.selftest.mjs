@@ -176,6 +176,17 @@ test("freshSession: a Stop during the new connect closes it when it lands", asyn
   assert.ok(late.closed);
 });
 
+test("current() turns false for a connect that a Stop overtook", async () => {
+  const seen = [];
+  const r = createResumer({ connect: async (_h, current) => { seen.push(current); return { close() {} }; } });
+  await r.start();
+  assert.equal(seen[0](), true);
+  r.stop();
+  assert.equal(seen[0](), false, "a late onopen must not restart hooks or show listening");
+  await r.start();
+  assert.equal(seen[0](), false, "a newer start does not revive the old connect");
+});
+
 test("resumeNote says what history cannot", () => {
   assert.equal(resumeNote({ handle: "h" }), "[session] The connection dropped and was restored; the conversation continues.");
   const n = resumeNote({ handle: null, lost: ["click"], listenOnly: true, looking: "/a.png" });

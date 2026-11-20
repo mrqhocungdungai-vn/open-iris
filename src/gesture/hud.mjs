@@ -75,7 +75,8 @@ ipcMain.handle("settings:get", () => settings);
 function setSettings({ span = settings.span, mode = settings.mode, camera = settings.camera, side = settings.side, cam = settings.cam } = {}) {
   if (!(span >= 0.2 && span <= 1) || !["absolute", "trackpad"].includes(mode) || typeof camera !== "boolean" || !["right", "left"].includes(side)) return;
   settings = { span, mode, camera, side, cam: cleanDevice(cam) };
-  fs.writeFileSync(SETTINGS, JSON.stringify(settings));
+  fs.writeFileSync(`${SETTINGS}.tmp`, JSON.stringify(settings));
+  fs.renameSync(`${SETTINGS}.tmp`, SETTINGS); // atomic: a crash mid-write must not reset hand settings
   log("INFO", "settings", JSON.stringify(settings));
   broadcast("settings", settings); // HUD (its 📷 follows ⌃⌥C) + main window
 }

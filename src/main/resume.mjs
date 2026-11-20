@@ -15,7 +15,7 @@ export function createResumer({ connect, onReconnect, onGiveUp, log = () => {}, 
   // A connect that lands after stop() belongs to no session: close it.
   async function attempt(g) {
     let s;
-    try { s = await connect(handle); } catch (e) { if (g === gen) closed({ reason: e?.message || String(e) }); return null; }
+    try { s = await connect(handle, () => g === gen); } catch (e) { if (g === gen) closed({ reason: e?.message || String(e) }); return null; }
     if (g !== gen) { try { s?.close(); } catch {} return null; }
     onReconnect?.(s, handle);
     return s;
@@ -39,7 +39,7 @@ export function createResumer({ connect, onReconnect, onGiveUp, log = () => {}, 
     // First connect: errors go to the caller (bad key shows in the UI), no retry.
     async start() {
       gen++; live = true; handle = null; attempts = 0;
-      const g = gen, s = await connect(null);
+      const g = gen, s = await connect(null, () => g === gen); // current(): false once stop() or a newer start() ran
       if (g !== gen) { try { s?.close(); } catch {} return null; }
       return s;
     },

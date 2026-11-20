@@ -50,7 +50,8 @@ const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
 const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, welcomed: c?.welcomed === true });
-const writeConfig = (c) => fs.writeFileSync(configFile, JSON.stringify(clean(c), null, 2) + "\n");
+// tmp + rename: a crash mid-write must not leave half a file, which readConfig would turn into defaults
+const writeConfig = (c) => (fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(clean(c), null, 2) + "\n"), fs.renameSync(`${configFile}.tmp`, configFile));
 function readConfig() {
   try { return clean(JSON.parse(fs.readFileSync(configFile, "utf8"))); } catch { return clean(); }
 }
@@ -157,7 +158,7 @@ async function connectLive(opts) {
   const ai = new GoogleGenAI({ apiKey });
   let opened = false; // a reconnect is the same session: hooks keep running, SessionStart does not fire again
   // Every reconnect resends the exact setup of this Start plus the handle: S0 showed a resume silently keeps the old setup anyway.
-  const open = async (handle) => {
+  const open = async (handle, current) => {
     let me; // this connection; onclose of an older one must not reset a newer session
     me = await ai.live.connect({
       model,
@@ -170,6 +171,7 @@ async function connectLive(opts) {
       },
       callbacks: {
         onopen: () => {
+          if (!current()) return log("INFO", "live", "connected after stop: ignored"); // onopen fires before connect() resolves
           log("INFO", "live", "connected");
           send("live:status", "listening");
           if (!opened) hooks.start();
@@ -377,7 +379,7 @@ async function clearContext() {
   }
   if (!session) return;
   // The new session does not know: say it silently, as after a reconnect.
-  if (listenOnly) session.sendClientContent({ turns: [{ role: "user", parts: [{ text: "[session] Listen mode is ON: keep listening, do not reply, do not speak and do not call any tool until it ends." }] }], turnComplete: false });
+  if (listenOnly) try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: "[session] Listen mode is ON: keep listening, do not reply, do not speak and do not call any tool until it ends." }] }], turnComplete: false }); } catch (e) { log("ERROR", "live", `clear: listen note: ${e?.message || e}`); }
   if (looking) tellLooking();
 }
 function setMuted(on) {
@@ -568,9 +570,11 @@ ipcMain.on("live:audio-in", (_e, arrayBuffer) => {
   chunksIn++;
   const buf = Buffer.from(arrayBuffer);
   if (rms16(buf) > VOICE_RMS) lastVoiceAt = Date.now();
-  session.sendRealtimeInput({
-    audio: { data: buf.toString("base64"), mimeType: "audio/pcm;rate=16000" },
-  });
+  try {
+    session.sendRealtimeInput({
+      audio: { data: buf.toString("base64"), mimeType: "audio/pcm;rate=16000" },
+    });
+  } catch (e) { log("ERROR", "live", `audio-in: ${e?.message || e}`); }
 });
 
 // Gallery View feature: a folder browser full screen in the overlay (gesture/hud-ui.js). Every entry is a card: images show
@@ -630,7 +634,7 @@ function tellLooking() {
   if (!session) return; // connectLive sends it on connect
   log("INFO", "gallery", `looking at ${looking || "(nothing)"}`);
   const text = looking ? `[gallery] The user is now looking at the image ${looking}` : "[gallery] The user closed the image.";
-  session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false });
+  try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "gallery", e?.message || String(e)); }
 }
 
 process.on("uncaughtException", (e) => log("ERROR", "main", e?.stack || String(e)));
@@ -641,7 +645,7 @@ app.whenReady().then(() => {
   log("INFO", "app", `start electron=${process.versions.electron} level=${process.env.LOG_LEVEL || "info"} log=${logFile}`);
   initGesture(log, home, (on) => {
     // A full turn, so Iris speaks: the user may not be looking at the HUD when the 🤘 hold or ⌃⌥G switches it.
-    session?.sendClientContent({ turns: [{ role: "user", parts: [{ text: `[hand control] Hand control is now ${on ? "ON" : "OFF"}. Tell the user in one short sentence.` }] }], turnComplete: true });
+    try { session?.sendClientContent({ turns: [{ role: "user", parts: [{ text: `[hand control] Hand control is now ${on ? "ON" : "OFF"}. Tell the user in one short sentence.` }] }], turnComplete: true }); } catch (e) { log("ERROR", "control", e?.message || String(e)); }
   });
   win = new BrowserWindow({
     width: 800,
