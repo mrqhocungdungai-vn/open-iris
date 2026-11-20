@@ -146,7 +146,7 @@ async function connectLive(opts) {
   hooks = createHooks({
     plugins, getConfig: () => readConfig().plugins, trust: readTrust(), home, lang, core: { PreToolCall: [(p) => taint.check(p)] },
     send: (text) => {
-      if (!session || listenOnly) return false; // kept, retried next second (createHooks)
+      if (!session || listenOnly || inFlight.size) return false; // kept, retried next second (createHooks); a turn now would cut a running tool call
       try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: true }); } catch (e) { log("ERROR", "plugins", `speak: ${e?.message || e}`); return false; }
       return true;
     },
