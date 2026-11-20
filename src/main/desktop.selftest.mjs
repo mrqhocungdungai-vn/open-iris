@@ -1,6 +1,6 @@
 // Self-check for desktop.mjs with a fake agent-desktop CLI: node desktop.selftest.mjs (part of pnpm test).
 import assert from "node:assert/strict";
-import { desktopTools, treeText } from "./desktop.mjs";
+import { cleanTools, desktopTools, TOOL_DEFAULTS, treeText } from "./desktop.mjs";
 
 // cli(argv, stdin) answers from a list of handlers; every call is recorded.
 function fake(answer) {
@@ -8,6 +8,18 @@ function fake(answer) {
   const cli = async (argv, stdin) => (calls.push({ argv, stdin }), answer(argv) ?? { ok: true, data: {} });
   const tools = Object.fromEntries(desktopTools(cli).map((t) => [t.name, t]));
   return { calls, run: (name, args) => tools[name].run(args) };
+}
+
+// cleanTools: unknown and old coding keys are dropped, missing ones get defaults, values become booleans.
+{
+  const t = cleanTools({ start_coding_task: true, do_task: true, bogus: 1, click_app_control: 0, read_app_text: "yes" });
+  assert.deepEqual(Object.keys(t), Object.keys(TOOL_DEFAULTS));
+  assert.equal(t.click_app_control, false);
+  assert.equal(t.read_app_text, true);
+  assert.equal(t.press_key_combo, TOOL_DEFAULTS.press_key_combo);
+  assert.deepEqual(cleanTools(), TOOL_DEFAULTS);
+  // The switches cover exactly the desktop tools.
+  assert.deepEqual(Object.keys(TOOL_DEFAULTS).sort(), desktopTools().map((x) => x.name).sort());
 }
 
 // Every tool is marked desktop and has a schema Gemini accepts.

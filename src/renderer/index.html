@@ -15,9 +15,8 @@
   </fieldset>
 </header>
 <main>
-<!-- Conversation first: the session to talk to, then the log fills the window. -->
+<!-- Conversation first: the log fills the window. -->
 <section id="p-talk">
-  <div id="session-row" hidden><label><span data-en="Claude Code session">Session Claude Code</span> <select id="session"></select></label> <button id="refresh" aria-label="Tải lại danh sách session" title="Tải lại danh sách session" data-en-aria-label="Reload the session list" data-en-title="Reload the session list">↻</button> <button id="save-session" aria-label="Lưu session này làm mặc định" title="Lưu session này làm mặc định cho lần mở sau" data-en-aria-label="Save this session as the default" data-en-title="Save this session as the default for next launch">★</button></div>
   <pre id="log" tabindex="0" aria-label="Hội thoại" data-en-aria-label="Conversation"></pre>
 </section>
 <section id="p-set" class="scroll">
@@ -31,13 +30,6 @@
   <div class="perm-actions"><button id="welcome-open" data-en="Check setup">Kiểm tra cài đặt</button> <small data-en="Key, permissions, tools on this Mac">Key, quyền, công cụ trên máy</small></div>
   <h2 lang="en">Agent Tools</h2>
   <fieldset id="tools"><small data-en="Changes take effect at the next Start.">Thay đổi có hiệu lực từ lần Bắt đầu kế tiếp.</small></fieldset>
-  <!-- Advanced Tools, off by default: voice coding through Orca CLI + Claude Code. Locked while either CLI is missing. -->
-  <h2 lang="en">Advanced Tools</h2>
-  <label class="feature"><input id="coding" type="checkbox" role="switch" disabled /> <span><span data-en="Claude Code: hand coding tasks over by voice">Claude Code: giao việc lập trình bằng giọng nói</span> <small id="coding-why" data-en="needs Orca CLI and Claude Code; off by default">cần Orca CLI và Claude Code; tắt sẵn</small></span></label>
-  <div id="coding-box" hidden>
-    <fieldset id="coding-tools"></fieldset>
-    <small data-en="Then pick a session in the Conversation tab. Takes effect at the next Start.">Bật xong, chọn session ở tab Hội thoại. Có hiệu lực từ lần Bắt đầu kế tiếp.</small>
-  </div>
   <!-- Owner prompt and skills (persona.mjs): read at connect, like the tool switches. -->
   <h2 data-en="Owner">Chủ nhân</h2>
   <p class="more"><small data-en="~/.open-iris/IRIS.md: who you are, what Iris calls you, your preferences. Sent to Gemini at every Start, so no passwords. Takes effect at the next Start.">~/.open-iris/IRIS.md: bạn là ai, Iris gọi bạn thế nào, sở thích. Gửi cho Gemini mỗi lần Bắt đầu, đừng ghi mật khẩu. Có hiệu lực từ lần Bắt đầu kế tiếp.</small></p>
@@ -85,16 +77,12 @@
 </main>
 <p id="error" role="alert" hidden></p>
 <footer id="run"><button id="toggle">Bắt đầu</button> <button id="mute" disabled>🎤 Mic</button> <button id="listen" disabled aria-pressed="false" title="Chỉ nghe: Iris vẫn nghe để hiểu ngữ cảnh nhưng không nói và không làm gì" data-en-title="Listen only: Iris keeps listening for context but does not speak or act">👂 Chỉ nghe</button> <button id="gallery-open" title="Mở Gallery View từ thư mục người dùng ~/" data-en-title="Open Gallery View at your home folder ~/">🖼 Gallery</button><span id="status" role="status" data-state="offline">Chưa chạy</span> <label id="hud-box" title="Lớp phủ trên màn hình: con trỏ tay, hội thoại, nút Iris (⌃⌥H)" data-en-title="Screen overlay: hand pointer, conversation, Iris buttons (⌃⌥H)"><input id="hud" type="checkbox" role="switch" /> <span lang="en">Enter HUD</span></label> <a id="hud-guide-link" href="../gesture/hud-guide.html" target="_blank" title="Hướng dẫn HUD: các nút, phím tắt" data-en-title="HUD guide: buttons, shortcuts" aria-label="Hướng dẫn HUD" data-en-aria-label="HUD guide">?</a></footer>
-<dialog id="ask" aria-labelledby="ask-title">
-  <h2 id="ask-title"></h2>
-  <form method="dialog"><button value="" data-en="Cancel">Huỷ</button> <button value="ok" autofocus data-en="Open">Mở</button></form>
-</dialog>
 <!-- Welcome / setup check (welcome.js): first launch, or Thiết lập → Kiểm tra cài đặt. Missing pieces only lock their feature. -->
 <dialog id="welcome" aria-labelledby="w-title">
   <div class="w-dots"><i></i><i></i><i></i><i></i><i></i></div>
   <section data-step="0">
     <h2 id="w-title" data-en="Welcome to Iris">Chào mừng đến Iris</h2>
-    <p data-en="Iris controls your Mac by voice and by hand, and talks to Claude Code through Orca.">Iris điều khiển máy Mac bằng giọng nói và bàn tay, và nói chuyện với Claude Code qua Orca.</p>
+    <p data-en="Iris controls your Mac by voice and by hand.">Iris điều khiển máy Mac bằng giọng nói và bàn tay.</p>
     <p><small data-en="A few checks first, about 2 minutes. A step not done only locks its feature; the rest still works.">Vài bước kiểm tra trước khi dùng, khoảng 2 phút. Bước nào chưa xong thì tính năng đó tạm khoá, bạn vẫn dùng được phần còn lại.</small></p>
   </section>
   <section data-step="1" hidden>

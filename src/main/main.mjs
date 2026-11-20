@@ -2,18 +2,17 @@
 // live-config.mjs, live-messages.mjs). The API key stays in the main process;
 // the renderer only captures the mic and plays audio.
 import { app, BrowserWindow, ipcMain, shell } from "electron";
-import { FunctionResponseScheduling, GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { cleanDevice } from "../renderer/devices.js";
-import { desktopTools } from "./desktop.mjs";
+import { cleanTools, desktopTools } from "./desktop.mjs";
 import { keyFormatOk, liveSetup } from "./live-config.mjs";
 import { cleanTopic, cohostBrief, createRecap, LISTEN_OFF_EVENT, LISTEN_ON_EVENT, RECAP_EVENT, refuseCalls } from "./livestream.mjs";
 import { cleanSkills, loadOwner, loadSkills, personaBrief, saveOwner, skillTools } from "./persona.mjs";
 import { closeHud, initGesture, lockHand, pipeLogs, setGallery } from "../gesture/hud.mjs";
-import { cleanTools, followUpToSend, hasCli, listSessions, openSession, registry, responsesToSend } from "./tools.mjs";
 
 // Everything open-iris saves lives in ~/.open-iris/ (.env, config.json, logs/).
 const home = path.join(os.homedir(), ".open-iris");
@@ -38,8 +37,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-// session: title of the default Claude Code session (titles survive restarts, terminal handles do not).
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), coding: c?.coding === true, cohost: c?.cohost === true, recap: c?.recap !== false, topic: cleanTopic(c?.topic), welcomed: c?.welcomed === true, session: typeof c?.session === "string" ? c.session.slice(0, 200) : "" });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), cohost: c?.cohost === true, recap: c?.recap !== false, topic: cleanTopic(c?.topic), welcomed: c?.welcomed === true });
 const writeConfig = (c) => fs.writeFileSync(configFile, JSON.stringify(clean(c), null, 2) + "\n");
 function readConfig() {
   try { return clean(JSON.parse(fs.readFileSync(configFile, "utf8"))); } catch { return clean(); }
@@ -98,24 +96,21 @@ async function startLive(opts) {
 }
 
 async function connectLive(opts) {
-  const { lang, model, voice, tools, skills: skillOn, coding } = clean(opts);
+  const { lang, model, voice, tools, skills: skillOn } = clean(opts);
   const saved = readConfig();
-  writeConfig({ ...saved, lang, model, voice, tools, coding, skills: { ...saved.skills, ...skillOn } }); // keeps the saved default session and switches of skills not listed now
+  writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn } }); // keeps the switches of skills not listed now
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     log("ERROR", "live", `GEMINI_API_KEY is not set (${envFile})`);
     throw new Error(`GEMINI_API_KEY is not set (${envFile})`);
   }
-  // The picked session's terminal handle; tools check it is still live on every call.
-  const sessionHandle = coding && typeof opts?.session === "string" ? opts.session : null;
   // IRIS.md and skills are read here, once: edits apply from the next Start, like the tool switches.
   const skills = loadSkills(home, (m) => log("WARN", "skills", m)).filter((s) => skillOn[s.name] !== false);
-  // Coding tools only with the advanced Claude Code feature on (Features tab).
-  enabledTools = [...desktopTools(), ...(coding ? registry(undefined, sessionHandle) : [])].filter((t) => tools[t.name]).concat(skillTools(skills));
+  enabledTools = desktopTools().filter((t) => tools[t.name]).concat(skillTools(skills));
   // Livestream co-host, read from config like IRIS.md: switch and topic apply from the next Start. Owner notes stay last.
   recapOn = saved.cohost && saved.recap;
   const brief = (saved.cohost ? cohostBrief(saved.topic, recapOn) : "") + personaBrief(loadOwner(home), skills);
-  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} session=${sessionHandle || "none"} cohost=${saved.cohost} recap=${recapOn}`);
+  log("INFO", "live", `connecting model=${model} voice=${voice} lang=${lang} tools=${enabledTools.map((t) => t.name).join(",") || "none"} cohost=${saved.cohost} recap=${recapOn}`);
   chunksIn = 0;
   chunksOut = 0;
   send("live:status", "connecting");
@@ -212,17 +207,16 @@ async function handleToolCalls(calls) {
   }
   const functionResponses = await Promise.all(calls.map(async ({ id, name, args }) => {
     const tool = enabledTools.find((t) => t.name === name);
-    // Desktop calls queue up in call order (a click then a type must not race); Orca calls run in parallel.
+    // Desktop calls queue up in call order (a click then a type must not race); skill calls run in parallel.
     const r = !tool ? { ok: false, error: `tool not enabled: ${name}` } : tool.desktop ? await (desktopQueue = desktopQueue.then(() => runDesktop(tool, args))) : await tool.run(args);
     const out = r.ok ? { output: r.output } : { error: r.error };
     log("INFO", "tool", `${name} ${JSON.stringify(args || {}).slice(0, 80)} -> ${r.ok ? "ok" : "error"} ${JSON.stringify(out).length}B`);
     if (!r.ok && tool?.desktop) log("WARN", "tool", `${name} ${JSON.stringify(r.error).slice(0, 2000)}`); // why a type or click failed, for the eval loop
-    if (r.followUp) sendFollowUp(s, id, name, r.followUp);
-    // NON_BLOCKING: willContinue tells Gemini a second response (the agent's reply) follows.
-    return { id, name, response: out, ...(r.followUp && { willContinue: true }) };
+    return { id, name, response: out };
   }));
-  const live = responsesToSend(functionResponses, cancelledCalls, s, session);
-  if (!live.length) return;
+  // A cancelled call's response is never sent, nor any response for a session that has ended since.
+  const live = functionResponses.filter((f) => !cancelledCalls.delete(f.id));
+  if (s !== session || !live.length) return;
   try { s.sendToolResponse({ functionResponses: live }); } catch (e) { log("ERROR", "tool", `sendToolResponse: ${e?.message || e}`); }
 }
 
@@ -232,15 +226,6 @@ async function runDesktop(tool, args) {
   lockHand(true);
   send("live:log", `🤖 ${tool.name}`); // the HUD transcript shows why the hand stopped answering
   try { return await tool.run(args); } finally { lockHand(false); }
-}
-
-// The agent's reply for a NON_BLOCKING call, spoken when Gemini is idle (not interrupting the user).
-async function sendFollowUp(s, id, name, followUp) {
-  const r = await followUp;
-  const out = r.reply ? { output: r.reply } : { error: r.error };
-  log("INFO", "tool", `${name} follow-up -> ${r.reply ? `reply ${r.reply.length} chars` : `error ${r.error}`}`);
-  if (!followUpToSend(id, cancelledCalls, s, session)) return;
-  try { s.sendToolResponse({ functionResponses: [{ id, name, response: out, scheduling: FunctionResponseScheduling.WHEN_IDLE }] }); } catch (e) { log("ERROR", "tool", `follow-up: ${e?.message || e}`); }
 }
 
 function stopLive() {
@@ -282,8 +267,6 @@ ipcMain.handle("config:mic", (_e, mic) => {
   writeConfig({ ...readConfig(), mic });
   log("INFO", "devices", `mic ${JSON.stringify(readConfig().mic?.label ?? "default")}`);
 });
-ipcMain.handle("sessions:list", () => listSessions());
-ipcMain.handle("coding:check", async () => ({ orca: await hasCli("orca"), claude: await hasCli("claude") }));
 ipcMain.handle("config:welcomed", () => writeConfig({ ...readConfig(), welcomed: true }));
 // Welcome wizard: check the key against Gemini, then keep it in ~/.open-iris/.env (0600). Returns "" or an error text.
 ipcMain.handle("key:save", async (_e, key) => {
@@ -301,24 +284,15 @@ ipcMain.handle("key:save", async (_e, key) => {
   log("INFO", "app", `GEMINI_API_KEY saved to ${envFile}`);
   return "";
 });
-ipcMain.handle("config:coding", (_e, on) => writeConfig({ ...readConfig(), coding: on }));
 // Features › Livestream: { cohost, recap, topic }, any subset; clean() checks each one.
 ipcMain.handle("config:live", (_e, patch) => {
   const { cohost, recap, topic } = patch || {};
   writeConfig({ ...readConfig(), ...(cohost !== undefined && { cohost }), ...(recap !== undefined && { recap }), ...(topic !== undefined && { topic }) });
   log("INFO", "live", `livestream settings ${JSON.stringify({ cohost, recap, topic })}`);
 });
-ipcMain.handle("config:session", (_e, title) => {
-  writeConfig({ ...readConfig(), session: title });
-  log("INFO", "session", `default ${JSON.stringify(readConfig().session)}`);
-});
-ipcMain.handle("sessions:open", (_e, id) => {
-  log("INFO", "session", `open ${id}`);
-  return openSession(id);
-});
 ipcMain.handle("live:start", (_e, opts) => startLive(opts));
 ipcMain.handle("live:stop", () => stopLive());
-// HUD buttons: Start/Stop goes through the main window so it uses that window's session/model/voice/tool picks.
+// HUD buttons: Start/Stop goes through the main window so it uses that window's model/voice/tool picks.
 ipcMain.handle("live:state", () => ({ status: liveStatus, muted, listenOnly }));
 ipcMain.on("iris:toggle", () => win && !win.isDestroyed() && win.webContents.send("iris:toggle"));
 ipcMain.on("iris:mute", (_e, on) => {

@@ -115,7 +115,18 @@ const TYPE_WAYS = {
 // shortcut: matched by app name; add other Chromium browsers here when they show the same problem.
 const KEYSTROKE_APPS = /^(google chrome|chromium|microsoft edge|brave browser|arc|opera|vivaldi)$/i;
 
-// Registry entries like tools.mjs registry(): { name, description, parameters, desktop: true, run }.
+// One switch per tool; all on by default although they act on screen (user, 2026-11-19).
+export const TOOL_DEFAULTS = {
+  list_running_apps: true, open_or_focus_app: true, scan_app_controls: true, find_app_control: true, read_app_text: true,
+  click_app_control: true, pick_list_option: true, type_into_text_field: true, press_key_combo: true,
+};
+
+// Trust boundary (config file / IPC): unknown names are dropped, values coerced to booleans.
+export function cleanTools(t) {
+  return Object.fromEntries(Object.keys(TOOL_DEFAULTS).map((k) => [k, t && k in t ? Boolean(t[k]) : TOOL_DEFAULTS[k]]));
+}
+
+// Registry entries: { name, description, parameters, desktop: true, run }.
 // run() never throws and returns { ok, output } or { ok: false, error }. One instance per live session.
 export function desktopTools(cli = runCli) {
   // shortcut: per app, in memory only, so each session re-learns it once (~2s for Teams); persist it if that bothers.

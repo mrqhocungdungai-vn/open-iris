@@ -6,9 +6,8 @@ import { GoogleGenAI } from "@google/genai";
 import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { desktopTools } from "../src/main/desktop.mjs";
+import { desktopTools, TOOL_DEFAULTS } from "../src/main/desktop.mjs";
 import { liveSetup } from "../src/main/live-config.mjs";
-import { registry, TOOL_DEFAULTS } from "../src/main/tools.mjs";
 
 // expect: tools that are a right first call; [] means the right answer is to speak, not call a tool.
 // Opening the named app first is fine: it gets a fake ok and the call after it is scored.
@@ -24,13 +23,7 @@ const CASES = [
   { say: "Nhấn cmd n trong Notes để tạo ghi chú mới", expect: ["press_key_combo"] },
   { say: "Safari đang hiện những nút gì?", expect: ["scan_app_controls", "read_app_text"] },
   { say: "Tìm hiểu giúp mình giá vàng hôm nay", expect: ["open_or_focus_app", "list_running_apps", []] }, // the brief says ask which app when unsure
-  { say: "Sửa lỗi trong file main.mjs của repo open-iris, app không khởi động được", expect: ["start_coding_task"] },
-  { say: "Chạy pnpm test trong terminal rồi báo kết quả", expect: ["start_coding_task"] },
-  { say: "Đọc màn hình terminal cho mình", expect: ["start_coding_task", []] },
-  { say: "Việc lập trình lúc nãy xong chưa?", expect: ["check_coding_task_status"] },
-  { say: "Lúc trước mình đã làm tới đâu trong dự án rồi?", expect: ["recall_past_coding_tasks"] },
-  { say: "Nhắc lại kết quả lập trình vừa rồi", expect: ["repeat_coding_task_result"] },
-  { say: "Dừng việc đang code lại", expect: [[]] }, // must ask first
+  { say: "Đọc màn hình terminal cho mình", expect: [[]] }, // app tools never read a terminal
   { say: "Kéo file ảnh trên desktop vào thùng rác", expect: [[]] }, // drag: hand it to the user
   { say: "Chào Iris, hôm nay bạn khỏe không?", expect: [[]] },
 ];
@@ -38,8 +31,8 @@ const CASES = [
 const { values: opt } = parseArgs({ options: { runs: { type: "string", default: "1" }, model: { type: "string", default: "models/gemini-3.8-live" }, only: { type: "string" }, case: { type: "string" } } });
 try { process.loadEnvFile(path.join(os.homedir(), ".open-iris/.env")); } catch { /* real env */ }
 const only = opt.only?.split(",");
-// Same set main.mjs builds when every switch is at its default, except the coding tools are all on here.
-const enabled = [...desktopTools(), ...registry()].filter((t) => (only ? only.includes(t.name) : t.name in TOOL_DEFAULTS));
+// Same set main.mjs builds when every switch is at its default.
+const enabled = desktopTools().filter((t) => (only ? only.includes(t.name) : t.name in TOOL_DEFAULTS));
 const setup = liveSetup("vi", enabled);
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 

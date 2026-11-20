@@ -4,18 +4,13 @@ const on = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payl
 
 contextBridge.exposeInMainWorld("iris", {
   getConfig: () => ipcRenderer.invoke("config:get"),
-  listSessions: () => ipcRenderer.invoke("sessions:list"),
-  checkCoding: () => ipcRenderer.invoke("coding:check"), // { orca, claude }: found or not
-  saveCoding: (on) => ipcRenderer.invoke("config:coding", on),
   saveLive: (patch) => ipcRenderer.invoke("config:live", patch), // Features › Livestream: { cohost, recap, topic }
   saveKey: (key) => ipcRenderer.invoke("key:save", key), // checked against Gemini first; "" or an error text
   saveWelcomed: () => ipcRenderer.invoke("config:welcomed"),
-  saveDefaultSession: (title) => ipcRenderer.invoke("config:session", title),
   saveLang: (lang) => ipcRenderer.invoke("config:lang", lang),
   saveMic: (mic) => ipcRenderer.invoke("config:mic", mic), // { id, label } or null = system default
   saveOwner: (text) => ipcRenderer.invoke("owner:set", text), // ~/.open-iris/IRIS.md
   openSkills: () => ipcRenderer.invoke("skills:open"), // "" or an error text
-  openSession: (id) => ipcRenderer.invoke("sessions:open", id),
   start: (opts) => ipcRenderer.invoke("live:start", opts),
   stop: () => ipcRenderer.invoke("live:stop"),
   sendAudio: (arrayBuffer) => ipcRenderer.send("live:audio-in", arrayBuffer),

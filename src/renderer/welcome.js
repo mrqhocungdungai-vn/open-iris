@@ -1,12 +1,11 @@
 // Welcome / setup check (index.html #welcome): opens on first launch and from Thiết lập → Kiểm tra cài đặt.
-// Steps: welcome, Gemini key, macOS permissions, CLIs, what works now. A missing piece only locks its own feature.
+// Steps: welcome, Gemini key, macOS permissions, tools, what works now. A missing piece only locks its own feature.
 // Uses $ and tr from renderer.js.
 (() => {
   const d = $("welcome");
   let step = 0;
   let hasKey = false;
   let perms = {};
-  let cli = {};
 
   // One .perm row (style.css): name, state badge, optional button, what it is for.
   const row = (ok, name, state, why, action) => {
@@ -18,10 +17,10 @@
   };
 
   const load = () =>
-    Promise.allSettled([window.gesture.getPerms().then((p) => (perms = p || {})), window.iris.checkCoding().then((c) => (cli = c || {}))]).then(() => d.open && render());
+    window.gesture.getPerms().then((p) => (perms = p || {}), () => {}).then(() => d.open && render());
 
   function render() {
-    const ok = { mic: perms.microphone === "granted", ax: perms.accessibility === "granted", cam: perms.camera === "granted", orca: !!cli.orca, claude: !!cli.claude };
+    const ok = { mic: perms.microphone === "granted", ax: perms.accessibility === "granted", cam: perms.camera === "granted" };
     const PERMS = [
       ["microphone", "Micro", tr("Để Iris nghe bạn nói", "So Iris can hear you")],
       ["accessibility", "Accessibility", tr("Để Iris bấm, gõ trong app và di chuột bằng tay", "So Iris can click and type in apps, and move the mouse by hand")],
@@ -37,11 +36,7 @@
     $("w-perm-note").textContent = tr("Bật xong trong System Settings, quay lại đây: trạng thái tự cập nhật.", "After switching it on in System Settings, come back here: the state updates itself.")
       + (perms.packaged === false && host ? tr(` Bản dev: cấp quyền cho ${host}.`, ` Dev build: grant ${host}.`) : "");
 
-    const recheck = [tr("Kiểm tra lại", "Check again"), load];
-    const found = (yes) => (yes ? tr("✓ Tìm thấy", "✓ Found") : tr("Chưa tìm thấy", "Not found"));
     $("w-clis").replaceChildren(
-      row(ok.orca, "Orca CLI", found(ok.orca), tr("Mở và điều khiển phiên Claude Code. Cài Orca rồi bấm Kiểm tra lại.", "Opens and drives Claude Code sessions. Install Orca, then Check again."), !ok.orca && recheck),
-      row(ok.claude, "Claude Code", found(ok.claude), tr("Agent lập trình mà Iris giao việc.", "The coding agent Iris hands work to."), !ok.claude && recheck),
       row(true, "agent-desktop", tr("✓ Có sẵn", "✓ Bundled"), tr("Đi kèm app, dùng cho tool điều khiển app.", "Comes with the app, used by the app-control tools.")),
     );
 
@@ -51,7 +46,6 @@
       [tr("🖱 Điều khiển app bằng giọng", "🖱 Control apps by voice"), [...voice, [ok.ax, "Accessibility"]]],
       ["✋ Hand Task Vision", [[ok.cam, "Camera"], [ok.ax, "Accessibility"]]],
       ["🖼 Gallery View", [[ok.cam, "Camera"]]],
-      [tr("🤖 Giao việc cho Claude Code", "🤖 Hand work to Claude Code"), [...voice, [ok.orca, "Orca CLI"], [ok.claude, "Claude Code"]]],
     ];
     const missing = (needs) => needs.filter(([has]) => !has).map(([, name]) => name);
     $("w-caps").replaceChildren(...CAPS.map(([name, needs]) => {
@@ -63,7 +57,6 @@
     if (!missing(voice).length) tut.push(tr("Bấm Bắt đầu rồi nói: “mở Notes và viết chữ xin chào”.", "Press Start, then say: “open Notes and write hello”."));
     if (ok.cam && ok.ax) tut.push(tr("Giơ tay trước camera, giữ 🤘 hoặc bấm ⌃⌥G để điều khiển bằng tay. Chụm ngón = click.", "Raise your hand to the camera, hold 🤘 or press ⌃⌥G for hand control. Pinch = click."));
     if (ok.cam) tut.push(tr("Bấm 🖼 Gallery, ✌ để xoay, chụm hai lần để mở.", "Press 🖼 Gallery, ✌ to turn, double-pinch to open."));
-    if (!missing(CAPS[4][1]).length) tut.push(tr("Bật Thiết lập → Advanced Tools → Claude Code, chọn session ở tab Hội thoại, rồi nói: “Claude đang làm gì rồi?”.", "Turn on Settings → Advanced Tools → Claude Code, pick a session in the Conversation tab, then say: “What is Claude doing?”."));
     tut.push(tr("⌃⌥H ẩn/hiện HUD. Hướng dẫn đầy đủ ở tab Tính năng.", "⌃⌥H shows/hides the HUD. Full guides are in the Features tab."));
     $("w-tut").replaceChildren(...tut.map((t) => Object.assign(document.createElement("li"), { textContent: t })));
   }

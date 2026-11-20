@@ -119,23 +119,13 @@ config.then((c) => {
     $(id).value = c[id];
   }
   setLang(c.lang);
-  const desk = new Set(c.options.desktopTools);
+  $("tools").append(Object.assign(document.createElement("strong"), { textContent: groupName() }));
   for (const [name, on] of Object.entries(c.tools)) {
-    // App tools here; coding tools under Advanced Tools › Claude Code, shown only while that feature is on.
-    const group = desk.has(name) ? "desk" : "code";
-    const box = group === "desk" ? $("tools") : $("coding-tools");
-    if (group === "desk" && $("tools").lastElementChild?.dataset?.group !== group) {
-      const h = document.createElement("strong");
-      h.dataset.group = group;
-      h.textContent = groupName(group);
-      $("tools").append(h);
-    }
     const label = document.createElement("label");
     label.lang = "en"; // tool ids stay English
     label.innerHTML = `<input type="checkbox" role="switch" name="${name}"> ${name}`;
     label.firstChild.checked = on;
-    label.dataset.group = group;
-    box.append(label);
+    $("tools").append(label);
   }
   $("owner").value = c.owner;
   for (const { name, description } of c.options.skills) {
@@ -153,15 +143,14 @@ config.then((c) => {
     $("skills").append(label);
   }
 });
-const groupName = (g) => (g === "desk" ? tr("Điều khiển máy tính (agent-desktop)", "Computer control (agent-desktop)") : tr("Lập trình (Claude Code qua Orca)", "Coding (Claude Code via Orca)"));
+const groupName = () => tr("Điều khiển máy tính (agent-desktop)", "Computer control (agent-desktop)");
 $("lang").onchange = () => (setLang($("lang").value), window.iris.saveLang($("lang").value));
 document.addEventListener("langchange", () => {
-  document.querySelectorAll("#tools strong").forEach((h) => (h.textContent = groupName(h.dataset.group)));
+  document.querySelectorAll("#tools strong").forEach((h) => (h.textContent = groupName()));
   $("owner-state").textContent = "";
   $("topic-state").textContent = "";
   showListen();
   for (const id of ["guide-link", "hud-guide-link", "gallery-guide-link"]) $(id).search = "?lang=" + document.documentElement.lang;
-  showSessions();
   showStatus();
   showMute();
   $("toggle").textContent = mic ? tr("Dừng", "Stop") : tr("Bắt đầu", "Start");
@@ -179,52 +168,6 @@ $("skills-open").onclick = async () => {
   const err = await window.iris.openSkills();
   if (err) showError("open skills", new Error(err));
 };
-// Sessions to talk to: running ones, then named ones that can be resumed.
-let sessions = [];
-async function loadSessions() {
-  try {
-    sessions = await window.iris.listSessions();
-  } catch (e) {
-    sessions = [];
-    showError("list sessions", e);
-  }
-  showSessions();
-  // Pick the saved default (running copies come first in the list).
-  const i = sessions.findIndex((s) => s.title === saved);
-  if (i >= 0) $("session").value = i;
-  showSaved();
-}
-function showSessions() {
-  const pickedNow = $("session").value;
-  $("session").replaceChildren(new Option(tr("— không chọn session —", "— no session —"), ""), ...sessions.map((s, i) => new Option(`${s.running ? "●" : "○"} ${s.title} · ${s.cwd.split("/").pop()}${s.running ? "" : tr(" (chưa chạy)", " (not running)")}`, i)));
-  $("session").value = pickedNow;
-}
-let saved = ""; // title of the default session in config.json
-// Settings › Advanced Tools › Claude Code (off by default). Locked while Orca CLI or Claude Code is missing; when off, the
-// session row and coding tools stay hidden and Start sends no coding tool.
-let codingLocked = true;
-function showCoding() {
-  const on = $("coding").checked;
-  $("coding-box").hidden = !on;
-  $("session-row").hidden = !on;
-  if (on && !sessions.length) loadSessions(); // only now: with the feature off, a missing Orca is not an error
-}
-config.then(async (c) => {
-  saved = c.session;
-  $("coding").checked = c.coding;
-  const found = await window.iris.checkCoding();
-  const missing = [!found.orca && "Orca CLI", !found.claude && "Claude Code"].filter(Boolean);
-  codingLocked = missing.length > 0;
-  $("coding").disabled = codingLocked;
-  if (codingLocked) {
-    $("coding").checked = false;
-    const why = $("coding-why");
-    [why.dataset.vi, why.dataset.en] = [`🔒 chưa tìm thấy ${missing.join(" và ")}`, `🔒 ${missing.join(" and ")} not found`];
-    why.textContent = tr(why.dataset.vi, why.dataset.en);
-  }
-  showCoding();
-});
-$("coding").onchange = () => (window.iris.saveCoding($("coding").checked), showCoding());
 // Features › Livestream: saved right away, read by main.mjs at the next Start.
 const liveIds = ["cohost", "recap", "live-topic", "topic-save"];
 const showLive = () => ($("live-box").hidden = !$("cohost").checked);
@@ -245,21 +188,9 @@ $("topic-save").onclick = async () => {
   }
 };
 $("live-topic").oninput = () => ($("topic-state").textContent = "");
-$("refresh").onclick = loadSessions;
 $("t-talk").onchange = () => ($("log").scrollTop = $("log").scrollHeight); // a hidden tab ignores scrollTop, so catch up on return
-const showSaved = () => {
-  const on = !!saved && sessions[$("session").value]?.title === saved;
-  $("save-session").textContent = on ? "★" : "☆";
-  $("save-session").ariaPressed = on; // the star alone is a visual-only state
-};
-$("session").onchange = showSaved;
-$("save-session").onclick = async () => {
-  saved = sessions[$("session").value]?.title ?? ""; // "— không chọn session —" clears the default
-  await window.iris.saveDefaultSession(saved);
-  showSaved();
-};
 
-const toolBoxes = () => [...document.querySelectorAll("#tools input, #coding-tools input")];
+const toolBoxes = () => [...document.querySelectorAll("#tools input")];
 const skillBoxes = () => [...document.querySelectorAll("#skills input")];
 
 window.iris.onAudio(play);
@@ -276,8 +207,7 @@ window.iris.onStatus((status) => {
   if (status === "offline") {
     stopMic();
     $("toggle").textContent = tr("Bắt đầu", "Start");
-    for (const id of ["lang", "model", "voice", "session", "refresh", "save-session"]) $(id).disabled = false;
-    $("coding").disabled = codingLocked;
+    for (const id of ["lang", "model", "voice"]) $(id).disabled = false;
     liveIds.forEach((id) => ($(id).disabled = false));
     toolBoxes().forEach((b) => (b.disabled = false));
     skillBoxes().forEach((b) => (b.disabled = false));
@@ -300,7 +230,7 @@ window.iris.onListen((on) => ((listenOnly = on), showListen(), showStatus()));
 $("listen").onclick = () => window.iris.listen(!listenOnly);
 $("toggle").onclick = async () => {
   if (mic) return window.iris.stop();
-  // No second click while starting: it would race the first start (and openSession).
+  // No second click while starting: it would race the first start.
   $("toggle").disabled = true;
   $("error").hidden = true;
   try {
@@ -310,29 +240,10 @@ $("toggle").onclick = async () => {
   }
 };
 
-// Modal yes/no in the page (replaces window.confirm): resolves true only on the "Mở" button.
-const ask = (text) =>
-  new Promise((resolve) => {
-    const d = $("ask");
-    $("ask-title").textContent = text;
-    d.addEventListener("close", () => (resolve(d.returnValue === "ok"), (d.returnValue = "")), { once: true }); // Esc leaves returnValue "", reset so an old "ok" can't leak
-    d.showModal();
-  });
-
 async function start() {
-  const s = $("coding").checked ? sessions[$("session").value] : undefined;
-  if (s && !s.running) {
-    if (!(await ask(tr(`"${s.title}" chưa chạy. Mở ngay?`, `"${s.title}" is not running. Open it now?`)))) return;
-    try {
-      s.handle = await window.iris.openSession(s.id);
-      s.running = true;
-    } catch (e) {
-      return showError("open session", e);
-    }
-  }
   try {
-    const opts = { session: s?.handle, coding: $("coding").checked };
-    for (const id of ["session", "refresh", "save-session", "coding", ...liveIds]) $(id).disabled = true;
+    const opts = {};
+    for (const id of liveIds) $(id).disabled = true;
     for (const id of ["lang", "model", "voice"]) {
       $(id).disabled = true;
       opts[id] = $(id).value;

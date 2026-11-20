@@ -2,9 +2,9 @@
 
 A macOS voice assistant that controls your computer. You talk to Iris, which runs on Gemini Live, and it:
 
+- talks with you in the persona you pick, with skills you can add, and can co-host a livestream with short answers, a spoken recap and a listen-only mode;
 - opens apps, clicks, reads and types in them, using [agent-desktop](https://github.com/vercel-labs/agent-desktop) through the macOS accessibility API;
-- starts and steers Claude Code coding tasks in Orca terminals, then reads Claude's reply aloud;
-- moves the mouse with hand gestures from your camera, using MediaPipe, with a small floating HUD.
+- moves the mouse with hand gestures from your camera, using MediaPipe, with a small floating HUD and a Gallery View.
 
 Each feature and each tool has its own switch in the app.
 
@@ -38,7 +38,7 @@ macOS will ask for these permissions:
 ## Layout
 
 ```
-src/main/       Electron main process: app, windows, Gemini session, tools, desktop control
+src/main/       Electron main process: app, windows, Gemini session, persona and skills, desktop tools
 src/preload/    the bridge between main and the pages
 src/renderer/   the main window (HTML, CSS, JS)
 src/gesture/    hand control: camera engine, HUD window, Swift mouse helper
@@ -52,7 +52,6 @@ There is no bundler. The pages load ES modules straight from `node_modules`.
 ## Data and privacy
 
 - Settings, the API key and logs live in `~/.open-iris/`. Logs are written to `~/.open-iris/logs/main.log`.
-- Text from Orca and terminal screens is never sent to Gemini. Gemini only gets Claude's own reply text.
 - Desktop tools send what is on screen in the app you name to Gemini. You can turn them off in the app.
 
 ## License
