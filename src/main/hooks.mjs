@@ -753,3 +753,20 @@ export function createHooks({
     },
   };
 }
+
+// Sample field text for a check or a try: the hint without its "e.g." part, else the label.
+export const sampleValues = (plugin) => Object.fromEntries(plugin.fields.map((f) => [f.key, f.hint.replace(/^(ví dụ|e\.g\.)\s*:?\s*/i, "") || f.label]));
+
+// pnpm plugin:check --preview: what one plugin sends Gemini with every group and tool on, through the same createHooks path
+// as a session. Command hooks never run here (their output is only known when they run), so they are listed by id.
+// home: a scratch folder, which createHooks needs for plugin-data.
+export async function previewPlugin(plugin, values, home) {
+  const config = { [plugin.name]: { on: true, fields: values, groups: Object.fromEntries(plugin.groups.map((g) => [g.name, { on: true }])), tools: Object.fromEntries(plugin.tools.map((t) => [t.name, { on: true }])) } };
+  const hooks = createHooks({ plugins: [plugin], getConfig: () => config, trust: { [plugin.name]: "preview" }, hashOf: () => "preview", home, send: () => false, run: async () => ({ code: 0, stdout: "", stderr: "" }) });
+  const start = await hooks.emit("SessionStart");
+  return {
+    context: start.context, events: hooks.speaks(), tools: hooks.tools(),
+    speak: plugin.groups.flatMap((g) => g.hooks.filter((h) => h.type === "speak").map((h) => fill(h.text, values)).filter(Boolean).map((t) => `SYSTEM_EVENT_HOOK ${g.id}: ${t}`)),
+    commands: plugin.groups.filter((g) => g.hooks.some((h) => h.type === "command")).map((g) => `${g.id}@${g.event}`),
+  };
+}

@@ -1,0 +1,8 @@
+{
+  "name": "context-start",
+  "version": "1.0.0",
+  "open_iris_api": 1,
+  "description": "Example: tells Iris a fact at the start of each session.",
+  "fields": [{ "key": "team", "label": "Nhóm", "label_en": "Team", "hint": "e.g. design" }],
+  "components": { "hooks": "./hooks/hooks.json" }
+}

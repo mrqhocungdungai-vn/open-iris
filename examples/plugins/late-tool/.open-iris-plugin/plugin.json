@@ -1,0 +1,7 @@
+{
+  "name": "late-tool",
+  "version": "1.0.0",
+  "open_iris_api": 1,
+  "description": "Example: a tool that answers at once and gives its real result later.",
+  "components": { "tools": "./tools/tools.json" }
+}

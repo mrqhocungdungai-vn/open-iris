@@ -8,7 +8,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { GoogleGenAI } from "@google/genai";
 import { desktopTools, TOOL_DEFAULTS } from "../../src/main/desktop.mjs";
-import { createHooks, fill, loadPlugin, trustHash } from "../../src/main/hooks.mjs";
+import { createHooks, fill, loadPlugin, sampleValues, trustHash } from "../../src/main/hooks.mjs";
 import { liveSetup } from "../../src/main/live-config.mjs";
 import { greeting, personaBrief } from "../../src/main/persona.mjs";
 
@@ -21,7 +21,7 @@ const plugin = loadPlugin(resolve(dirArg));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Fields get their hint without the "e.g." part, every group and tool is on, and the folder is trusted as it is now.
-const values = Object.fromEntries(plugin.fields.map((f) => [f.key, f.hint.replace(/^(ví dụ|e\.g\.)\s*:?\s*/i, "") || f.label]));
+const values = sampleValues(plugin);
 const config = { [plugin.name]: { on: true, fields: values, groups: Object.fromEntries(plugin.groups.map((g) => [g.name, { on: true }])), tools: Object.fromEntries(plugin.tools.map((t) => [t.name, { on: true }])) } };
 // shortcut: only static speak texts; a command hook's speak and a late tool's result are not sent, add them when a plugin needs it.
 const events = plugin.groups.flatMap((g) => g.hooks.filter((h) => h.type === "speak").map((h) => `SYSTEM_EVENT_HOOK ${g.id}: ${fill(h.text, values)}`)).filter((t) => !t.endsWith(": "));

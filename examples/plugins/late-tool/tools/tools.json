@@ -1,0 +1,11 @@
+{
+  "tools": [{
+    "name": "count_down",
+    "label": "Đếm ngược",
+    "label_en": "Count down",
+    "description": "Start a short countdown. The result comes back later, when it ends.",
+    "parameters": { "type": "object", "properties": { "seconds": { "type": "number", "description": "How long, in seconds" } }, "required": ["seconds"] },
+    "command": "sh ./count-down.sh",
+    "late": { "timeout_min": 1 }
+  }]
+}

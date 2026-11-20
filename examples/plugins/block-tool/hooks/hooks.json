@@ -1,0 +1,5 @@
+{
+  "hooks": {
+    "PreToolCall": [{ "name": "no-keys", "label": "Chặn phím tắt", "label_en": "No key combos", "matcher": "^press_key_combo$", "hooks": [{ "type": "command", "command": "sh ./guard.sh" }] }]
+  }
+}

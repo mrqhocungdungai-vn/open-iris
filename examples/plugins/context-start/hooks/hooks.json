@@ -1,0 +1,5 @@
+{
+  "hooks": {
+    "SessionStart": [{ "name": "team", "label": "Nhóm", "label_en": "Team", "hooks": [{ "type": "context", "text": "The user works on the {team} team." }] }]
+  }
+}

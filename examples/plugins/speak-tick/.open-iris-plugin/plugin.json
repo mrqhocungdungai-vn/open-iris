@@ -1,0 +1,8 @@
+{
+  "name": "speak-tick",
+  "version": "1.0.0",
+  "open_iris_api": 1,
+  "description": "Example: Iris reminds the user to take a break every few minutes.",
+  "fields": [{ "key": "task", "label": "Break", "label_en": "Break", "hint": "e.g. stretch" }],
+  "components": { "hooks": "./hooks/hooks.json" }
+}

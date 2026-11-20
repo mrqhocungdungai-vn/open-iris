@@ -1,0 +1,5 @@
+{
+  "hooks": {
+    "Tick": [{ "name": "remind", "label": "Nhắc nghỉ", "label_en": "Break reminder", "every_min": 2, "hooks": [{ "type": "speak", "text": "Remind the user to {task}." }] }]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "block-tool",
+  "version": "1.0.0",
+  "open_iris_api": 1,
+  "description": "Example: a command hook that stops Iris from pressing key combos.",
+  "components": { "hooks": "./hooks/hooks.json" }
+}
