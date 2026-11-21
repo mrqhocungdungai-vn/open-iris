@@ -115,6 +115,22 @@ function play({ data, mimeType }) {
   sources.push(src);
 }
 
+// System announcements play on their own source, outside Iris's queue: they may overlap Iris and a flush never cuts them.
+window.iris.onAnnounce((data) => {
+  const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+  const view = new DataView(bytes.buffer);
+  const n = bytes.byteLength >> 1;
+  if (!n) return;
+  out ??= new AudioContext();
+  const buffer = out.createBuffer(1, n, 24000);
+  const ch = buffer.getChannelData(0);
+  for (let i = 0; i < n; i++) ch[i] = view.getInt16(i * 2, true) / 32768;
+  const src = out.createBufferSource();
+  src.buffer = buffer;
+  src.connect(out.destination);
+  src.start();
+});
+
 function flushPlayback() {
   sources.forEach((s) => s.stop());
   if (sources.length) console.debug(`playback flushed ${sources.length} queued chunks`);

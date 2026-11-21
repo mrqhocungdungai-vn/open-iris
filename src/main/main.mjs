@@ -17,6 +17,7 @@ import { contextMeter } from "./context-meter.mjs";
 import { cleanInput } from "./input.mjs";
 import { createResumer, renewFresh, resumeNote } from "./resume.mjs";
 import { ago, deafWatch, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
+import { createAnnouncer, sayLine } from "./announce.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanName, cleanSkills, greeting, nameFor, loadPersona, loadSkills, personaBrief, savePersona, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
@@ -73,6 +74,14 @@ function log(level, tag, message) {
 if (migrated) log("INFO", "app", `migrated GEMINI_API_KEY from ${repoEnv} to ${envFile}`);
 
 let win = null;
+const announcer = createAnnouncer({ home, log, say: (model, voice, line) => sayLine(process.env.GEMINI_API_KEY, model, voice, line) });
+// Plays a fixed system line in the main window, outside the conversation; silent when the clip is not made yet.
+function announce(key) {
+  const { model, voice } = readConfig();
+  const pcm = announcer.clip(model, voice, key);
+  if (pcm && win && !win.isDestroyed()) win.webContents.send("announce:play", pcm.toString("base64"));
+}
+const makeClips = () => { if (process.env.GEMINI_API_KEY) { const { model, voice } = readConfig(); announcer.ensure(model, voice); } };
 let session = null;
 let chunksIn = 0; // mic chunks sent this session
 let micLevel = micMeter(); // [perf] mic lines, new each Start
@@ -131,6 +140,7 @@ async function connectLive(opts) {
   const saved = readConfig(), keep = saved.session.keep;
   const abilities = typeof opts?.tools?.[ABILITIES] === "boolean" ? opts.tools[ABILITIES] : saved.abilities; // its switch sits with the tool switches
   writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn }, abilities }); // keeps the switches of skills not listed now
+  makeClips(); // Start saves the model and voice picks: clips for a new pair are made in the background
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     log("ERROR", "live", `GEMINI_API_KEY is not set (${envFile})`);
@@ -611,6 +621,7 @@ ipcMain.handle("key:save", async (_e, key) => {
   fs.chmodSync(envFile, 0o600);
   process.env.GEMINI_API_KEY = key;
   log("INFO", "app", `GEMINI_API_KEY saved to ${envFile}`);
+  makeClips();
   return "";
 });
 ipcMain.handle("live:start", (_e, opts) => startLive(opts));
@@ -742,7 +753,11 @@ app.whenReady().then(() => {
   });
   app.dock?.setIcon(path.join(import.meta.dirname, "../../assets", "icon.png")); // no packaged build yet, so dev would show Electron's icon
   log("INFO", "app", `start electron=${process.versions.electron} level=${process.env.LOG_LEVEL || "info"} log=${logFile}`);
-  initGesture(log, home, (on) => {
+  // shortcut: accepts the old control-only (on) and the new (event, on) from hud.mjs; drop the old form once A1 lands.
+  initGesture(log, home, (event, on) => {
+    if (typeof event === "boolean") [event, on] = ["control", event];
+    announce(`${event}-${on ? "on" : "off"}`);
+    if (event !== "control") return;
     // A full turn, so Iris speaks: the user may not be looking at the HUD when the 🤘 hold or ⌃⌥G switches it.
     try { session?.sendClientContent({ turns: [{ role: "user", parts: [{ text: `[hand control] Hand control is now ${on ? "ON" : "OFF"}. Tell the user in one short sentence.` }] }], turnComplete: true }); } catch (e) { log("ERROR", "control", e?.message || String(e)); }
   });
@@ -755,6 +770,7 @@ app.whenReady().then(() => {
   pipeLogs(win.webContents);
   win.on("closed", () => (closeHud(), closePop())); // the HUD is click-through and the pop-out has no engine, so neither outlives this window
   win.loadFile("src/renderer/index.html");
+  makeClips();
 });
 
 app.on("window-all-closed", () => {

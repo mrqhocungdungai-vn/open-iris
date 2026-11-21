@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld("iris", {
   galleryLook: (index) => ipcRenderer.send("gallery:look", index), // image in the viewer (-1 = none), for Iris
   onAudio: on("live:audio"),
   onInterrupt: on("live:interrupt"),
+  onAnnounce: on("announce:play"), // base64 24 kHz s16 clip of a fixed system line (main/announce.mjs)
   onStatus: on("live:status"),
   onLog: on("live:log"),
   getHistory: () => ipcRenderer.invoke("live:history"), // recent live:log rows kept in main memory (chat window)
