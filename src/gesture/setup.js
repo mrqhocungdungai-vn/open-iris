@@ -47,7 +47,7 @@
       $("perms").insertBefore(row, $("perms").lastElementChild);
     }
     ready = p.accessibility === "granted" && p.camera === "granted";
-    if (ready && !autoStarted) (autoStarted = true), loaded.then(() => window.gesture.vision(true));
+    if (ready && !autoStarted) (autoStarted = true), loaded.then(() => window.gesture.vision(true, true)); // quiet: no announcement at launch
     showVision();
   };
 
@@ -61,7 +61,7 @@
   window.gesture.onPerms(showPerms);
   window.gesture.onVision((on) => { vision = on; showVision(); });
   window.gesture.onHud((on) => ($("hud").checked = on));
-  window.gesture.vision(false); // page (re)load: the engine here starts stopped, so main's state must match
+  window.gesture.vision(false, true); // quiet; page (re)load: the engine here starts stopped, so main's state must match
   $("perm-request").onclick = async () => showPerms(await window.gesture.requestPerms());
   $("perm-refresh").onclick = refresh;
   $("host-reveal").onclick = () => window.gesture.revealHost();

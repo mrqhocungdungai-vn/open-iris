@@ -108,18 +108,18 @@ function logMetrics() {
   const parts = app.getAppMetrics().map((m) => `${names.get(m.pid) ?? m.type}=${m.cpu.percentCPUUsage.toFixed(1)}`);
   log("INFO", "perf", `[perf] cpu% ${parts.join(" ")} hud=${win ? "on" : "off"} camera=${pop ? "open" : "closed"}`);
 }
-function setVision(on) {
+function setVision(on, quiet = false) {
   if (on === vision) return broadcast("vision", on); // still echo, so a switch that moved on its own settles back
   vision = on;
   log("INFO", "vision", on ? "on" : "off");
-  onChange?.("vision", on);
+  if (!quiet) onChange?.("vision", on); // quiet: launch auto-start and page-load reset are not user switches
   if (!on) send("up 0 0"); // never leave the button held down
   clearInterval(perfTimer);
   perfTimer = on && setInterval(logMetrics, 5000);
   broadcast("vision", on);
   setControl(false, !on); // every start (and stop) begins paused: 🤘 hold or ⌃⌥G activates; on stop "vision off" alone is said
 }
-ipcMain.on("vision", (_e, on) => setVision(on === true));
+ipcMain.on("vision", (_e, on, quiet) => setVision(on === true, quiet === true));
 // Engine → HUD, every frame while vision runs (null = no ring). HUD gallery open/closed → engine (two-hand zoom).
 ipcMain.on("hand", (_e, s) => { win?.webContents.send("hand", s); pop?.webContents.send("hand", s); });
 ipcMain.on("hud:gallery", (_e, on) => {

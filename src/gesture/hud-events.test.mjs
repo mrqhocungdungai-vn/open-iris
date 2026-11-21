@@ -30,7 +30,7 @@ const { initGesture } = await import("./hud.mjs");
 const events = [];
 initGesture(() => {}, fs.mkdtempSync(path.join(os.tmpdir(), "hud-test-")), (event, on) => events.push(`${event}:${on}`));
 after(() => handlers.vision(null, false)); // stops the [perf] cpu timer even when an assert fails, so the run exits
-const step = (channel, on) => { events.length = 0; handlers[channel](null, on); return [...events]; };
+const step = (channel, on, quiet) => { events.length = 0; handlers[channel](null, on, quiet); return [...events]; };
 
 test("vision and control announce only real changes, vision off alone when it also drops control", () => {
   assert.deepEqual(step("vision", true), ["vision:true"]); // control was already off: no control event
@@ -41,4 +41,11 @@ test("vision and control announce only real changes, vision off alone when it al
   step("control:set", true);
   assert.deepEqual(step("vision", false), ["vision:false"]); // not also control:false
   assert.deepEqual(step("vision", false), []);
+});
+
+test("a quiet vision change (launch auto-start, page-load reset) announces nothing", () => {
+  assert.deepEqual(step("vision", true, true), []);
+  assert.deepEqual(step("vision", false, true), []);
+  assert.deepEqual(step("vision", true), ["vision:true"]); // a user switch still announces
+  assert.deepEqual(step("vision", false), ["vision:false"]);
 });
