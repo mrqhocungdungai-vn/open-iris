@@ -22,9 +22,9 @@ const dir = import.meta.dirname;
 const bin = path.join(dir, ".build", "mouse");
 const src = path.join(dir, "mouse.swift");
 
-export function initGesture(mainLog, home, controlChanged) {
+export function initGesture(mainLog, home, changed) {
   log = mainLog;
-  onControl = controlChanged;
+  onChange = changed;
   SETTINGS = path.join(home, "gesture.json");
   try { setSettings(JSON.parse(fs.readFileSync(SETTINGS, "utf8"))); } catch {} // missing or bad file: defaults
   if (!fs.existsSync(bin) || fs.statSync(bin).mtimeMs < fs.statSync(src).mtimeMs) {
@@ -94,9 +94,9 @@ ipcMain.on("orb", (_e, input) => win?.webContents.send("orb", input)); // { stat
 let control = false; // armed by 🤘 hold or Ctrl+Option+G after vision starts, so a real mouse isn't fought on switch-on
 let vision = false; // Hand Task Vision: the main window switches it on at launch once permissions are granted (gesture/setup.js)
 
-let onControl; // main.mjs: Iris says it out loud
-function setControl(on) {
-  if (on !== control) onControl?.(on); // setVision resets to off on every start: say it only on a real change
+let onChange; // main.mjs: onChange("vision" | "control", on) on a real change, for the system announcement
+function setControl(on, quiet = false) {
+  if (on !== control && !quiet) onChange?.("control", on); // setVision resets to off on every start: say it only on a real change
   control = on;
   log("INFO", "control", on ? "on" : "off");
   broadcast("control", on); // engine (main window) + HUD status
@@ -112,11 +112,12 @@ function setVision(on) {
   if (on === vision) return broadcast("vision", on); // still echo, so a switch that moved on its own settles back
   vision = on;
   log("INFO", "vision", on ? "on" : "off");
+  onChange?.("vision", on);
   if (!on) send("up 0 0"); // never leave the button held down
   clearInterval(perfTimer);
   perfTimer = on && setInterval(logMetrics, 5000);
   broadcast("vision", on);
-  setControl(false); // every start (and stop) begins paused: 🤘 hold or ⌃⌥G activates
+  setControl(false, !on); // every start (and stop) begins paused: 🤘 hold or ⌃⌥G activates; on stop "vision off" alone is said
 }
 ipcMain.on("vision", (_e, on) => setVision(on === true));
 // Engine → HUD, every frame while vision runs (null = no ring). HUD gallery open/closed → engine (two-hand zoom).
