@@ -1,6 +1,6 @@
 # Kế hoạch: sửa lỗi "Iris không nghe" và làm khung plugin chắc hơn
 
-Ngày 2026-11-20. Trạng thái: **đã duyệt; L1, L3, K1, K2, K3, K4 xong; E1 đã đo; E2, E3 bỏ (không giảm tỉ lệ điếc)**. Người viết: iris-core.
+Ngày 2026-11-20. Trạng thái: **đã duyệt; xong hết: L1, L3, K1–K4, K6, K7 xong; E1 đã đo; E2, E3, L4 đo rồi bỏ (kế hoạch không có L2)**. Người viết: iris-core.
 
 Tài liệu này không thay `docs/plugin-hooks-spec.md` (hợp đồng API 1). Nó gom hai việc lại:
 1. Lỗi "Iris không nghe": nguyên nhân thật nằm ở phiên Gemini, không nằm ở plugin.
@@ -94,7 +94,7 @@ Sau không tệ hơn trước. Các câu giọng bị lỡ trên 3.8 có ở c�
 
 ### Để sau, khi có nhu cầu
 
-- K6: nút "Chạy ngay" cho Tick. **Xong.** User duyệt bản xem trước; `hooks.runNow(id)` chạy nhóm Tick ngay và tính lại chu kỳ từ lúc bấm, lượt nói vẫn chờ 4 s yên lặng và cách 60 s. Nút mờ khi chưa Start hoặc nhóm tắt; nhóm bật giữa phiên báo "bật từ lần Start sau".
+- K6: nút "Chạy ngay" cho Tick. **Xong (7e5a9ee).** User duyệt bản xem trước; `hooks.runNow(id)` chạy nhóm Tick ngay và tính lại chu kỳ từ lúc bấm, lượt nói vẫn chờ 4 s yên lặng và cách 60 s. Nút mờ khi chưa Start hoặc nhóm tắt; nhóm bật giữa phiên báo "bật từ lần Start sau".
 - K7: **Xong, `06ef8e1`.** Mọi lệnh SessionStart chung trần 15 giây (`SESSION_START_MAX_MS`). Lệnh sau chỉ được phần thời gian còn lại, hết thì bỏ qua và ghi `failed` vào log. Test nằm trong `hooks.selftest.mjs`.
 - L4: **Không làm, đã đo.** `scripts/spikes/live-input.mjs` (2026-11-20) cho thấy chữ gõ tay đều được trả lời trên cả 3.8 và 3.1, dù gửi bằng `sendRealtimeInput({text})` hay bằng `sendClientContent`. Ảnh thì chỉ `sendClientContent` mới nhìn thấy: gửi qua realtime `video`, cả hai model đều nói "can't see". Hộp nhập gửi chữ và ảnh trong cùng một lượt, nên giữ một cách gửi là `sendClientContent`.
 - K5 cũ (chỉ cảnh báo) đã gộp vào L1.
@@ -124,5 +124,5 @@ Mỗi việc đi đúng vòng trong `CLAUDE.md`: dòng `proposed`, user duyệt,
 ## 6. Rủi ro
 
 - **L1 báo nhầm.** Ví dụ người dùng nói một câu rất dài trước khi transcript đầu tiên về, hoặc tiếng ồn to mà không phải lời nói. Ngưỡng 4 giây và 10 giây là ước lượng: `// shortcut:` ghi chú này, chỉnh lại theo log thật. Báo nhầm chỉ tốn một lần mở lại phiên.
-- **L1 không chữa được tận gốc.** Mỗi lần mở lại chỉ có khoảng 50% cơ hội nghe được. Hai lần thử nâng tỉ lệ lên khoảng 87%. Lỗi nằm ở phía Google, nên cần báo cho họ nếu E1 xác nhận tỉ lệ này.
+- **L1 không chữa được tận gốc.** E1 đo được mỗi phiên 3.8 chỉ có khoảng 30% cơ hội nghe được. Phiên đầu cộng hai lần mở lại nâng tỉ lệ lên khoảng 66% (1 − 0,7³); thử thật 2026-11-21 nghe được sau một lần mở lại, mất 742 ms. Lỗi nằm ở phía Google, nên cần báo cho họ nếu E1 xác nhận tỉ lệ này.
 - **K1 đổi system prompt của mọi phiên có plugin.** Phải đo bằng K3 trên cả hai model trước khi commit.
