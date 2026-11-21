@@ -410,7 +410,7 @@ export async function deliverLate({ id, name, args, from, result, current, resum
 // tools and every plugin tool wait for the user's own words (voice transcription or typed text). Plugin output, hook
 // context/speak and Iris's speech never clear it.
 // check is the core PreToolCall hook (createHooks `core`). confirmed:true alone does not pass: the user's yes clears the flag.
-export const TAINT_GATED = new Set(["click_app_control", "type_into_text_field", "press_key_combo", "pick_list_option", "open_or_focus_app"]);
+export const TAINT_GATED = new Set(["click_app_control", "type_into_text_field", "press_key_combo", "pick_list_option", "open_or_focus_app", "close_app", "scroll_app_view"]);
 export function createTaint(log = () => {}) {
   let on = false;
   return {

@@ -111,7 +111,7 @@ assert.deepEqual(d.posts, []); // ↺ or new session: still dropped
   const taint = createTaint((m) => logs.push(m));
   const th = createHooks({ plugins: [], getConfig: () => ({}), home: os.tmpdir(), core: { PreToolCall: [(p) => taint.check(p)] }, send: () => true });
   const pre = (name, args = {}) => th.emit("PreToolCall", { tool: { name, args } });
-  const gated = ["click_app_control", "type_into_text_field", "press_key_combo", "pick_list_option", "open_or_focus_app", "kit__echo", "kit__send"];
+  const gated = ["click_app_control", "type_into_text_field", "press_key_combo", "pick_list_option", "open_or_focus_app", "close_app", "scroll_app_view", "kit__echo", "kit__send"];
   for (const n of gated) assert.equal((await pre(n)).block, false); // untainted: runs
   taint.mark();
   for (const n of gated) {
