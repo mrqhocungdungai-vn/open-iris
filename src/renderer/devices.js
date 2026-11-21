@@ -22,6 +22,19 @@ export function deviceChoices(devices, kind, saved, tr) {
 // getUserMedia constraint: a plain deviceId is "ideal", so a missing device falls back to the default instead of failing.
 export const deviceConstraint = (choice) => (choice ? { deviceId: choice.id } : {});
 
+// Opens the picked camera. exact: an "ideal" deviceId lost to the system default (OBS Virtual Camera) like the mic did
+// (renderer.js startMic). Only a camera that is gone falls back to the default.
+export async function openVideo(base, choice, media = navigator.mediaDevices) {
+  if (!choice) return media.getUserMedia({ video: base });
+  try {
+    return await media.getUserMedia({ video: { ...base, deviceId: { exact: choice.id } } });
+  } catch (e) {
+    if (!["OverconstrainedError", "NotFoundError"].includes(e?.name)) throw e;
+    console.warn(`camera "${choice.label}" not available (${e.name}), using the system default`);
+    return media.getUserMedia({ video: base });
+  }
+}
+
 function initDevices() {
   const $ = (id) => document.getElementById(id);
   const tr = (vi, en) => (document.documentElement.lang === "en" ? en : vi);

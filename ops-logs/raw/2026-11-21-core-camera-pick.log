@@ -1,0 +1,4 @@
+2026-11-21T08:57:04.451Z [INFO] [settings] {"span":0.4,"mode":"trackpad","camera":false,"side":"right","cam":{"id":"<redacted>","label":"HD Webcam C615 (046d:082c)"}}
+2026-11-21T08:57:04.686Z [INFO] [vision] on
+2026-11-21T08:57:04.871Z [INFO] [renderer] hand vision: camera "OBS Virtual Camera"
+2026-11-21T08:57:04.871Z [INFO] [renderer] hand vision: camera + model ready
