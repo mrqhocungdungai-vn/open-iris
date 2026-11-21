@@ -51,7 +51,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, name: cleanName(c?.name), greet: c?.greet !== false, abilities: c?.abilities !== false, welcomed: c?.welcomed === true });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, announce: c?.announce !== false, name: cleanName(c?.name), greet: c?.greet !== false, abilities: c?.abilities !== false, welcomed: c?.welcomed === true });
 // tmp + rename: a crash mid-write must not leave half a file, which readConfig would turn into defaults
 const writeConfig = (c) => (fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(clean(c), null, 2) + "\n"), fs.renameSync(`${configFile}.tmp`, configFile));
 function readConfig() {
@@ -77,7 +77,8 @@ let win = null;
 const announcer = createAnnouncer({ home, log, say: (model, voice, line) => sayLine(process.env.GEMINI_API_KEY, model, voice, line) });
 // Plays a fixed system line in the main window, outside the conversation; silent when the clip is not made yet.
 function announce(key) {
-  const { model, voice } = readConfig();
+  const { model, voice, announce: on } = readConfig();
+  if (!on) return; // Features › System Announcements off: no sound, the silent notes still go
   const pcm = announcer.clip(model, voice, key);
   if (pcm && win && !win.isDestroyed()) win.webContents.send("announce:play", pcm.toString("base64"));
 }
@@ -592,6 +593,7 @@ ipcMain.handle("config:mic", (_e, mic) => {
 });
 ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, keep: on !== false } })); // clean() keeps only a boolean
 ipcMain.handle("config:compose", (_e, on) => writeConfig({ ...readConfig(), compose: on !== false }));
+ipcMain.handle("config:announce", (_e, on) => writeConfig({ ...readConfig(), announce: on !== false }));
 ipcMain.handle("config:meter", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, meter: on !== false } }));
 ipcMain.handle("config:name", (_e, name) => writeConfig({ ...readConfig(), name })); // clean() keeps one short plain line
 ipcMain.handle("config:greet", (_e, on) => writeConfig({ ...readConfig(), greet: on !== false }));

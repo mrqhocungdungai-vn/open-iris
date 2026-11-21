@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("iris", {
   saveKeep: (on) => ipcRenderer.invoke("config:keep", on), // Features › Giữ phiên dài → config.session.keep
   saveMeter: (on) => ipcRenderer.invoke("config:meter", on), // Features › Hiện mức context → config.session.meter
   saveCompose: (on) => ipcRenderer.invoke("config:compose", on), // Features › Gõ chữ, gửi ảnh và tệp → config.compose
+  saveAnnounce: (on) => ipcRenderer.invoke("config:announce", on), // Features › System Announcements → config.announce
   saveMic: (mic) => ipcRenderer.invoke("config:mic", mic), // { id, label } or null = system default
   savePersona: (text) => ipcRenderer.invoke("persona:set", text), // ~/.open-iris/IRIS.md, Iris's tone
   saveName: (name) => ipcRenderer.invoke("config:name", name), // what Iris calls the user → config.name
