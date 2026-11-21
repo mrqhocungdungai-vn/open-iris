@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanDevice, deviceChoices, deviceConstraint, openVideo } from "./devices.js";
+import { cleanDevice, deviceChoices, openVideo } from "./devices.js";
 
 const vi = (v) => v;
 const en = (_v, e) => e;
@@ -34,11 +34,6 @@ test("cleanDevice: keeps { id, label }, anything else is the system default", ()
     assert.equal(cleanDevice(bad), null);
 });
 
-test("deviceConstraint: plain (ideal) deviceId, nothing for the default", () => {
-  assert.deepEqual(deviceConstraint({ id: "c1", label: "" }), { deviceId: "c1" });
-  assert.deepEqual(deviceConstraint(null), {});
-});
-
 test("openVideo: exact deviceId for a pick, default for none, default again only when the pick is gone", async () => {
   const calls = [];
   const media = (fail) => ({ getUserMedia: async (c) => { calls.push(c.video); if (fail && c.video.deviceId) throw Object.assign(new Error("x"), { name: fail }); return "stream"; } });
@@ -62,7 +57,7 @@ test("importing in a page without the pickers (the HUD) does not throw", async (
   globalThis.document = { getElementById: () => null };
   try {
     const m = await import("./devices.js?hud");
-    assert.deepEqual(m.deviceConstraint({ id: "x", label: "" }), { deviceId: "x" });
+    assert.equal(typeof m.openVideo, "function");
   } finally {
     delete globalThis.document;
   }

@@ -19,9 +19,6 @@ export function deviceChoices(devices, kind, saved, tr) {
   return opts;
 }
 
-// getUserMedia constraint: a plain deviceId is "ideal", so a missing device falls back to the default instead of failing.
-export const deviceConstraint = (choice) => (choice ? { deviceId: choice.id } : {});
-
 // Opens the picked camera. exact: an "ideal" deviceId lost to the system default (OBS Virtual Camera) like the mic did
 // (renderer.js startMic). Only a camera that is gone falls back to the default.
 export async function openVideo(base, choice, media = navigator.mediaDevices) {
@@ -65,5 +62,5 @@ function initDevices() {
   window.addEventListener("focus", refresh);
   document.addEventListener("langchange", show);
 }
-// Only the main window has the pickers; the HUD imports this file just for deviceConstraint.
+// Only the main window has the pickers; the HUD imports this file just for openVideo.
 if (globalThis.document?.getElementById("mic")) initDevices();
