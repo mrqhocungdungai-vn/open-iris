@@ -10,10 +10,12 @@ import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
+import { remember } from "../renderer/convo-view.mjs";
 import { TOOL_DEFAULTS, cleanTools, desktopTools } from "./desktop.mjs";
 import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput, typedEvent } from "./input.mjs";
+import { SENT_TOOL, sentFileTool } from "./gallery-send.mjs";
 import { createResumer, renewFresh, resumeNote } from "./resume.mjs";
 import { ago, deafWatch, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
 import { createAnnouncer, sayLine } from "./announce.mjs";
@@ -50,7 +52,7 @@ const LANGS = ["vi", "en"];
 const configFile = path.join(home, "config.json");
 // IPC/file trust boundary: anything not in an allowlist falls back to the default (first entry).
 const pick = (list, value) => (list.includes(value) ? value : list[0]);
-const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, announce: c?.announce !== false, name: cleanName(c?.name), greet: c?.greet !== false, abilities: c?.abilities !== false, welcomed: c?.welcomed === true });
+const clean = (c) => ({ lang: pick(LANGS, c?.lang), model: pick(MODELS, c?.model), voice: pick(VOICES, c?.voice), mic: cleanDevice(c?.mic), tools: cleanTools(c?.tools), skills: cleanSkills(c?.skills), plugins: cleanPluginConfig(c?.plugins), session: { keep: c?.session?.keep !== false, meter: c?.session?.meter !== false }, compose: c?.compose !== false, announce: c?.announce !== false, name: cleanName(c?.name), greet: c?.greet !== false, abilities: c?.abilities !== false, readSent: c?.readSent !== false, welcomed: c?.welcomed === true });
 // tmp + rename: a crash mid-write must not leave half a file, which readConfig would turn into defaults
 const writeConfig = (c) => (fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(clean(c), null, 2) + "\n"), fs.renameSync(`${configFile}.tmp`, configFile));
 function readConfig() {
@@ -96,7 +98,7 @@ let liveStatus = "offline"; // last live:status, for a HUD opened mid-session
 const history = []; // recent live:event payloads, memory only (gone on quit), for the HUD 💬 chat window opened mid-session
 const send = (channel, payload) => {
   if (channel === "live:status") liveStatus = payload;
-  if (channel === "live:event" && history.push(payload) > 400) history.splice(0, history.length - 400);
+  if (channel === "live:event") remember(history, payload);
   for (const w of channel === "live:audio" ? [win] : BrowserWindow.getAllWindows()) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 };
 let muted = false; // HUD 🔇: mic chunks are dropped here, the session stays open
@@ -112,6 +114,8 @@ let convo = 0; // bumped by ↺: a late result in flight then belongs to the dro
 const inFlight = new Map(); // tool call id → name, to tell the model which calls a dropped connection cut off
 // trust.json: { [plugin]: sha256 } approved in the Plugin tab. File trust boundary: only names and strings survive.
 const trustFile = path.join(home, "trust.json");
+// tmp + rename: a cut-off trust.json reads as {} and would silently untrust every plugin.
+const writeTrust = (t) => (fs.writeFileSync(`${trustFile}.tmp`, JSON.stringify(t, null, 2) + "\n"), fs.renameSync(`${trustFile}.tmp`, trustFile));
 function readTrust() {
   try {
     return Object.fromEntries(Object.entries(JSON.parse(fs.readFileSync(trustFile, "utf8"))).filter(([k, v]) => NAME.test(k) && typeof v === "string"));
@@ -138,7 +142,8 @@ async function connectLive(opts) {
   const { lang, model, voice, tools, skills: skillOn } = clean(opts);
   const saved = readConfig(), keep = saved.session.keep;
   const abilities = typeof opts?.tools?.[ABILITIES] === "boolean" ? opts.tools[ABILITIES] : saved.abilities; // its switch sits with the tool switches
-  writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn }, abilities }); // keeps the switches of skills not listed now
+  const readSent = typeof opts?.tools?.[SENT_TOOL] === "boolean" ? opts.tools[SENT_TOOL] : saved.readSent; // Gallery Send to Iris content tool, same place
+  writeConfig({ ...saved, lang, model, voice, tools, skills: { ...saved.skills, ...skillOn }, abilities, readSent }); // keeps the switches of skills not listed now
   makeClips(); // Start saves the model and voice picks: clips for a new pair are made in the background
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -172,7 +177,11 @@ async function connectLive(opts) {
   startTainted = !!start.tainted;
   if (startTainted) taint.mark();
   enabledTools = enabledTools.concat(hooks.tools()); // plugin command tools (spec §12): fixed for this session, like the desktop switches
-  const off = Object.keys(TOOL_DEFAULTS).filter((n) => !tools[n]).concat(hooks.offTools());
+  if (readSent) enabledTools = enabledTools.concat(sentFileTool({
+    allowed: (f) => sentFiles.has(f) || (!!looking && f === looking),
+    sendParts: (p) => sendParts(p) && (taint.mark(), true), // file text may try to steer Iris: writes then need the user's yes
+  }));
+  const off = Object.keys(TOOL_DEFAULTS).filter((n) => !tools[n]).concat(readSent ? [] : [SENT_TOOL], hooks.offTools());
   if (abilities) enabledTools = enabledTools.concat(abilitiesTool(enabledTools, off));
   const brief = personaBrief(loadPersona(home), skills, nameFor(saved.name, lang));
   const pluginEvents = hooks.speaks();
@@ -420,6 +429,7 @@ function stopLive() {
 let clearing = false;
 async function clearContext() {
   history.length = 0; // ↺ starts a fresh conversation, so the chat window starts empty too
+  sentFiles.clear(); // and forgets what was sent with Send to Iris
   return renewSession("clear");
 }
 // kind: "clear" (↺) or "deaf" (onDeaf); the deaf retry keeps the chat window.
@@ -549,7 +559,7 @@ ipcMain.handle("plugins:run-now", (_e, id) => (typeof id === "string" && hooks ?
 ipcMain.handle("plugins:trust", (_e, name) => {
   const p = loadPlugins(home).find((x) => x.name === name && !x.error);
   if (!p) throw new Error(`no loadable plugin named ${name}`);
-  fs.writeFileSync(trustFile, JSON.stringify({ ...readTrust(), [p.name]: trustHash(p.dir) }, null, 2) + "\n");
+  writeTrust({ ...readTrust(), [p.name]: trustHash(p.dir) });
   log("INFO", "plugins", `trusted ${p.name}`);
   return listPlugins().find((x) => x.name === p.name);
 });
@@ -569,7 +579,7 @@ ipcMain.handle("plugins:remove", async (e, name) => {
   if (response !== 0) return false;
   fs.rmSync(path.join(root, name), { recursive: true, force: true });
   const { [name]: _t, ...trust } = readTrust();
-  fs.writeFileSync(trustFile, JSON.stringify(trust, null, 2) + "\n");
+  writeTrust(trust);
   const saved = readConfig();
   const { [name]: _c, ...plugins } = saved.plugins;
   writeConfig({ ...saved, plugins });
@@ -613,8 +623,10 @@ ipcMain.handle("key:save", async (_e, key) => {
   } catch (e) { return e.message; }
   let lines = [];
   try { lines = fs.readFileSync(envFile, "utf8").split(/\r?\n/).filter((l) => l && !l.startsWith("GEMINI_API_KEY=")); } catch { /* no .env yet */ }
-  fs.writeFileSync(envFile, [...lines, `GEMINI_API_KEY=${key}`].join("\n") + "\n", { mode: 0o600 });
-  fs.chmodSync(envFile, 0o600);
+  // tmp + rename: a crash mid-write must not lose the key or the other lines
+  fs.writeFileSync(`${envFile}.tmp`, [...lines, `GEMINI_API_KEY=${key}`].join("\n") + "\n", { mode: 0o600 });
+  fs.chmodSync(`${envFile}.tmp`, 0o600);
+  fs.renameSync(`${envFile}.tmp`, envFile);
   process.env.GEMINI_API_KEY = key;
   log("INFO", "app", `GEMINI_API_KEY saved to ${envFile}`);
   makeClips();
@@ -674,6 +686,8 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i;
 const GALLERY_MAX = 36; // shortcut: only the first 36 entries (folders first, by name) fit the ring; add paging if folders get bigger
 let galleryEntries = []; // absolute paths, same order as the cards; the renderer only ever sends an index back
 let looking = ""; // image open in the viewer, so Iris knows what "this" is
+let galleryUp = ""; // the ⬆ card's folder (last entry), never sent to Iris
+const sentFiles = new Set(); // paths the user sent with Send to Iris: the only files read_sent_file reads, besides `looking`
 
 function showFolder(dir, open = "") {
   const all = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => !d.name.startsWith("."));
@@ -681,7 +695,8 @@ function showFolder(dir, open = "") {
   all.sort((a, b) => (kind(b) === "dir") - (kind(a) === "dir") || a.name.localeCompare(b.name, undefined, { numeric: true })); // folders first, A→Z
   const shown = all.slice(0, GALLERY_MAX);
   const up = dir === os.homedir() ? dir : path.dirname(dir); // ~/ is the top: no ⬆ above home
-  galleryEntries = [...shown.map((d) => path.join(dir, d.name)), ...(up !== dir ? [up] : [])];
+  galleryUp = up !== dir ? up : "";
+  galleryEntries = [...shown.map((d) => path.join(dir, d.name)), ...(galleryUp ? [up] : [])];
   const items = shown.map((d) => {
     const f = path.join(dir, d.name);
     return { name: d.name, kind: kind(d), ...(kind(d) === "image" && { url: pathToFileURL(f).href }) };
@@ -713,6 +728,15 @@ ipcMain.handle("gallery:item", async (_e, i) => {
   log("INFO", "gallery", `open with app ${f}`);
   return shell.openPath(f); // "" or macOS's error text
 });
+// Send to Iris on card i: only the path goes in, as silent context; the user's next words say what to do with it.
+ipcMain.handle("gallery:send", (_e, i) => {
+  const f = Number.isInteger(i) ? galleryEntries[i] : undefined; // IPC trust boundary: only an index into the list main built
+  if (!session || !f || f === galleryUp) return false;
+  const kind = fs.statSync(f, { throwIfNoEntry: false })?.isDirectory() ? "folder" : IMAGE_EXT.test(f) ? "image" : "file";
+  sentFiles.add(f);
+  log("INFO", "gallery", `sent ${kind} ${f}`);
+  return sendParts([{ text: `[gallery] The user sent you ${kind} ${f}. Wait for their next words to know what to do with it.` }]);
+});
 ipcMain.on("gallery:look", (_e, i) => lookAt((Number.isInteger(i) && IMAGE_EXT.test(galleryEntries[i] ?? "") && galleryEntries[i]) || ""));
 
 // Silent context: appended to the conversation without a turn, so Iris answers only when the user speaks.
@@ -724,8 +748,11 @@ function lookAt(file) {
 function tellLooking() {
   if (!session) return; // connectLive sends it on connect
   log("INFO", "gallery", `looking at ${looking || "(nothing)"}`);
-  const text = looking ? `[gallery] The user is now looking at the image ${looking}` : "[gallery] The user closed the image.";
-  try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text }] }], turnComplete: false }); } catch (e) { log("ERROR", "gallery", e?.message || String(e)); }
+  sendParts([{ text: looking ? `[gallery] The user is now looking at the image ${looking}` : "[gallery] The user closed the image." }]);
+}
+function sendParts(parts) {
+  try { session.sendClientContent({ turns: [{ role: "user", parts }], turnComplete: false }); } catch (e) { log("ERROR", "gallery", e?.message || String(e)); return false; }
+  return true;
 }
 
 process.on("uncaughtException", (e) => log("ERROR", "main", e?.stack || String(e)));

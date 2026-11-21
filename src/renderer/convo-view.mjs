@@ -2,6 +2,15 @@
 // Pure, no DOM. Events are main's live:event payloads (AG-UI type names, see docs/chat-ui-plan.md §2).
 // Turns are never mutated: a changed turn is a new object, so a renderer can keep one element per turn object.
 export const MAX_TURNS = 200;
+export const HISTORY_MAX = 400;
+
+// main's event store for a window opened mid-session (live:history). Voice chunks of one speaker are joined,
+// so the cap counts turns' pieces, not transcript words; reduce() gives the same turns either way.
+export function remember(history, e) {
+  const last = history.at(-1);
+  if (e?.type === "TEXT_MESSAGE_CONTENT" && e.via === "voice" && last?.type === e.type && last.via === "voice" && last.role === e.role) history[history.length - 1] = { ...last, delta: last.delta + e.delta };
+  else if (history.push(e) > HISTORY_MAX) history.splice(0, history.length - HISTORY_MAX);
+}
 
 const openIris = (t) => t?.kind === "iris" && !t.done;
 const replaceLast = (turns, t) => [...turns.slice(0, -1), t];

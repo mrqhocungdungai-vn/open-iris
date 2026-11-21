@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reduce, MAX_TURNS } from "./convo-view.mjs";
+import { reduce, remember, MAX_TURNS, HISTORY_MAX } from "./convo-view.mjs";
 
 const run = (events) => events.reduce(reduce, []);
 const you = (delta, via = "voice", files) => ({ type: "TEXT_MESSAGE_CONTENT", role: "user", via, delta, ...(files && { files }) });
@@ -60,4 +60,18 @@ test("keeps at most MAX_TURNS turns, and never mutates the input", () => {
   assert.equal(t[0].text, "5");
   const before = Object.freeze([Object.freeze({ kind: "you", via: "voice", text: "a", files: [] })]);
   assert.doesNotThrow(() => reduce(before, you("b")));
+});
+
+test("history joins voice chunks: a long talk fits the cap and replays to the same turns", () => {
+  const events = [];
+  for (let i = 0; i < 300; i++) events.push(you("a"), you(" b"), start(`t${i}`), ...Array.from({ length: 20 }, () => iris("x")), { type: "RUN_FINISHED" }, you("gõ", "typed"));
+  const h = [];
+  for (const e of events) remember(h, e);
+  assert.ok(h.length <= HISTORY_MAX);
+  assert.deepEqual(h.reduce(reduce, []), run(events).slice(-h.reduce(reduce, []).length));
+  const small = [you("mở"), you(" Finder"), iris("Đã"), iris(" mở."), you("x", "typed"), you("y", "typed")];
+  const hs = [];
+  for (const e of small) remember(hs, e);
+  assert.equal(hs.length, 4);
+  assert.deepEqual(hs.reduce(reduce, []), run(small));
 });

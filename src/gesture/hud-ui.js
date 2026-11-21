@@ -30,10 +30,8 @@ const interactive = () => {
   window.gesture.interactive(overDock || !$("gallery").hidden);
   window.gesture.hudGallery(!$("gallery").hidden); // the engine (main window) zooms with two hands only while it is open
 };
-for (const id of ["dock"]) {
-  $(id).onmouseenter = () => ((overDock = true), interactive());
-  $(id).onmouseleave = () => ((overDock = false), interactive());
-}
+$("dock").onmouseenter = () => ((overDock = true), interactive());
+$("dock").onmouseleave = () => ((overDock = false), interactive());
 
 // HUD orb: drawn here, driven by the main window (orb-ui.js), which owns the mic and the playback.
 const orb = POP ? null : mountOrb($("hud-orb"));
