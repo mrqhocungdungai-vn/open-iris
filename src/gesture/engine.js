@@ -2,7 +2,7 @@
 // HUD closed. Camera + MediaPipe HandLandmarker → mouse events (hud.mjs → Swift helper). Each frame's state is also sent
 // to the HUD overlay (if open) for its cursor ring, pose line and camera skeleton.
 import { DrawingUtils, FilesetResolver, HandLandmarker } from "../../node_modules/@mediapipe/tasks-vision/vision_bundle.mjs";
-import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isThumbUp, palmsOf, LOCK_HOLD_MS, pinchApproach, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
+import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isThumbUp, palmsOf, LOCK_HOLD_MS, pinchApproach, PINCH_ON, palmFacing, isFacing, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
 import { openVideo } from "../renderer/devices.js";
 import { handPerfLine } from "./perf.js";
 
@@ -28,6 +28,7 @@ let span = 0.6; // hand area that covers the screen, set from the main window
 let mode = "trackpad"; // or "absolute"
 let side = "right"; // hand that drives the mouse
 let poseState = null; // debounced pose, see settle()
+let lastBlocked = null; // click the last ✋ frame held back and why, see the blocked log in frame()
 let hand = null; // trackpad: filtered hand point; null = lifted (fist / no hand / scroll), so the next frame doesn't jump
 let hudGallery = false; // the HUD's gallery is open: two open hands zoom it instead of moving the mouse
 let cam = null; // Settings › Camera, { id, label } or null = system default
@@ -132,7 +133,7 @@ function showPose(lm, pose, ring = null, progress = 0, approach = 0) {
     drawer.drawConnectors(lm, HandLandmarker.HAND_CONNECTIONS, { color: "#0f0", lineWidth: 3 });
     drawer.drawLandmarks(lm, { color: "#f00", radius: 3 });
   }
-  const ratios = lm ? ` · trỏ ${pinchRatio(lm, 8).toFixed(2)} giữa ${pinchRatio(lm, 12).toFixed(2)}` : "";
+  const ratios = lm ? ` · trỏ ${pinchRatio(lm, 8).toFixed(2)} (2D ${pinchRatio(lm, 8, true).toFixed(2)}) giữa ${pinchRatio(lm, 12).toFixed(2)} (2D ${pinchRatio(lm, 12, true).toFixed(2)}) · lòng tay ${palmFacing(lm).toFixed(2)}` : "";
   $("hv-pose").textContent = pose;
   $("hv-pose").title = pose; // the chip is cut with … in the 200px preview
   if (pose !== lastPose) console.info(`gesture ${pose}${ratios}${control ? "" : " (control OFF)"}`); // ratios: to tune the pinch thresholds
@@ -293,9 +294,16 @@ function frame() {
   }
   // Clicks change only on frames that really read as ✋: entering/leaving ✌ or ✊ the thumb sits close to both fingers.
   const clean = raw === "move";
-  if (clean) pinched = isPinched(lm, pinched);
+  const facing = isFacing(lm);
+  if (clean) pinched = isPinched(lm, pinched) && (pinched || facing); // a new click needs the palm toward the camera; a press already down stays down
   if (pinched) glideV = null; // never click into a page that is still moving
-  const right = clean ? !pinched && isPinched(lm, rightPinched, 12) : rightPinched;
+  const right = clean ? !pinched && isPinched(lm, rightPinched, 12) && (rightPinched || facing) : rightPinched;
+  // Count the clicks the two gates hold back: the old 2D pinch would have clicked, but depth or the turned palm says no.
+  // shortcut: logs only the open-hand edge, drop once the 3D pinch and FACING_MIN are calibrated.
+  const why = (t) => (pinchRatio(lm, t) < PINCH_ON ? (facing ? null : "palm turned") : pinchRatio(lm, t, true) < PINCH_ON ? "depth" : null);
+  const blocked = (clean && !pinched && !right && [8, 12].map((t) => why(t) && `${t === 8 ? "left" : "right"} click by ${why(t)}`).find(Boolean)) || null;
+  if (blocked && blocked !== lastBlocked) console.info(`gesture blocked ${blocked} · trỏ ${pinchRatio(lm, 8).toFixed(2)} (2D ${pinchRatio(lm, 8, true).toFixed(2)}) giữa ${pinchRatio(lm, 12).toFixed(2)} (2D ${pinchRatio(lm, 12, true).toFixed(2)}) · lòng tay ${palmFacing(lm).toFixed(2)}`);
+  lastBlocked = blocked;
   const now = performance.now();
   anchor = clickLock(anchor, cursor, now);
   if (pinched && !held) anchor = { ...(anchor ?? cursor), until: Infinity }; // a 2nd pinch reuses the 1st point

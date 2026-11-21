@@ -42,6 +42,25 @@ test("pinch works with the middle finger for right click", () => {
   assert.equal(isPinched(lm, false, 8), false);
 });
 
+test("pinch uses depth: a sideways hand with the tips stacked in the image but apart in depth is not pinched", () => {
+  const lm = hand({ gap: 0.01 }); // 0.05 hand-sizes apart in the image
+  lm[8].z = -0.1; // index tip half a hand nearer the camera than the thumb tip
+  assert.equal(isPinched(lm, false), false);
+  lm[8].z = -0.01; // tips really touching: small depth noise still pinches
+  assert.equal(isPinched(lm, false), true);
+});
+
+test("palm facing: square to the camera passes, edge-on does not", async () => {
+  const { isFacing } = await import("./hand.js");
+  const lm = hand();
+  lm[5] = { x: 0.45, y: 0.6, z: 0 };
+  lm[17] = { x: 0.6, y: 0.62, z: 0 };
+  assert.equal(isFacing(lm), true); // palm flat to the camera
+  lm[5] = { x: 0.5, y: 0.6, z: -0.05 };
+  lm[17] = { x: 0.5, y: 0.6, z: 0.15 }; // hand turned edge-on: knuckles stacked, apart only in depth
+  assert.equal(isFacing(lm), false);
+});
+
 test("scroll pose is index + middle up, ring + pinky folded", () => {
   const lm = hand();
   const finger = (tip, pip, up) => {

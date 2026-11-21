@@ -1,7 +1,8 @@
-// Pure gesture math on MediaPipe hand landmarks (21 points, x/y normalized 0..1).
+// Pure gesture math on MediaPipe hand landmarks (21 points, x/y normalized 0..1, z = depth from the wrist on about the x scale).
 // Shared by the renderer and hand.test.mjs.
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const dist3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)); // test fixtures are 2D
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 // Cursor follows the index knuckle (5), not the fingertip: the knuckle barely moves when you pinch, so clicks don't drift.
@@ -27,9 +28,14 @@ export function smooth(prev, next, t, minCutoff = 0.7, beta = 10) {
 
 // Thumb tip (4) to a fingertip (8 index = left button, 12 middle = right click), scaled by hand size (wrist 0 → middle knuckle 9) so distance from camera doesn't matter.
 // Two thresholds (hysteresis) so a pinch near the edge doesn't flicker down/up.
-export const pinchRatio = (lm, tip = 8) => dist(lm[4], lm[tip]) / dist(lm[0], lm[9]);
+// 3D: a hand turned sideways puts the thumb tip over a fingertip in the image while they are still apart in depth.
+// `flat` = the old 2D ratio, only for the log that compares the two.
+export function pinchRatio(lm, tip = 8, flat = false) {
+  const d = flat ? dist : dist3;
+  return d(lm[4], lm[tip]) / d(lm[0], lm[9]);
+}
 
-const PINCH_ON = 0.25; // was 0.30/0.45: fingers visibly apart still counted as pinched
+export const PINCH_ON = 0.25; // was 0.30/0.45: fingers visibly apart still counted as pinched
 const PINCH_OFF = 0.33;
 export function isPinched(lm, wasPinched, tip = 8) {
   const d = pinchRatio(lm, tip);
@@ -83,6 +89,18 @@ export const isRock = (lm) => extended(lm, 8, 6) && !extended(lm, 12, 10) && !ex
 
 // Thumbs up 👍 (four fingers folded, thumb tip well above the index knuckle), held LOCK_HOLD_MS, toggles listen-only.
 // Checked before isFist, which ignores the thumb. A normal fist tucks the thumb below the knuckle, so it never counts.
+// Palm toward the camera: cosine between the palm's normal (wrist 0, index knuckle 5, pinky knuckle 17) and the camera axis.
+// 1 = palm (or back) square to the camera, 0 = hand edge-on. Signed; which sign is the palm depends on the hand, so the
+// gate uses the size only. shortcut: back of the hand also passes, add the sign per hand if the log shows back-hand clicks.
+export function palmFacing(lm) {
+  const a = { x: lm[5].x - lm[0].x, y: lm[5].y - lm[0].y, z: (lm[5].z ?? 0) - (lm[0].z ?? 0) };
+  const b = { x: lm[17].x - lm[0].x, y: lm[17].y - lm[0].y, z: (lm[17].z ?? 0) - (lm[0].z ?? 0) };
+  const n = { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+  return n.z / (Math.hypot(n.x, n.y, n.z) || 1);
+}
+export const FACING_MIN = 0.5; // up to ~60° turned still clicks; hardware calibration, tune from the "gesture" log lines
+export const isFacing = (lm) => Math.abs(palmFacing(lm)) >= FACING_MIN;
+
 export const isThumbUp = (lm) => isFist(lm) && dist(lm[4], lm[0]) > dist(lm[3], lm[0]) && (lm[5].y - lm[4].y) / dist(lm[0], lm[9]) > 0.35;
 
 // Click lock: while pinched, and for `hold` ms after letting go, the cursor stays on the click point unless the hand
