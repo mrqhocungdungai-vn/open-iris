@@ -1,0 +1,155 @@
+# ipcMain handlers
+src/gesture/hud.mjs:61:ipcMain.on("mouse", (_e, { action, x, y }) => {
+src/gesture/hud.mjs:75:ipcMain.handle("settings:get", () => settings);
+src/gesture/hud.mjs:84:ipcMain.on("settings:set", (_e, patch) => setSettings(patch));
+src/gesture/hud.mjs:90:ipcMain.on("gallery:enabled", (_e, on) => broadcast("gallery:enabled", (galleryOn = on === true)));
+src/gesture/hud.mjs:92:ipcMain.on("orb:enabled", (_e, on) => broadcast("orb:enabled", (orbOn = on === true)));
+src/gesture/hud.mjs:93:ipcMain.on("orb", (_e, input) => win?.webContents.send("orb", input)); // { state, inL, outL } from the main window, which owns the audio
+src/gesture/hud.mjs:122:ipcMain.on("vision", (_e, on, quiet) => setVision(on === true, quiet === true));
+src/gesture/hud.mjs:124:ipcMain.on("hand", (_e, s) => { win?.webContents.send("hand", s); pop?.webContents.send("hand", s); });
+src/gesture/hud.mjs:125:ipcMain.on("hud:gallery", (_e, on) => {
+src/gesture/hud.mjs:129:ipcMain.on("control:set", (_e, on) => setControl(on === true)); // 🤘-hold toggle in the HUD
+src/gesture/hud.mjs:165:ipcMain.on("open-settings", (_e, kind) => {
+src/gesture/hud.mjs:168:ipcMain.on("perms:reveal", () => HOST && shell.showItemInFolder(HOST));
+src/gesture/hud.mjs:171:ipcMain.handle("perms:request", async () => {
+src/gesture/hud.mjs:180:ipcMain.handle("perms:get", () => {
+src/gesture/hud.mjs:184:ipcMain.handle("hud", (_e, on) => setDock(on === true));
+src/gesture/hud.mjs:185:ipcMain.on("hud:interactive", (_e, on) => win?.setIgnoreMouseEvents(on !== true, { forward: true }));
+src/gesture/hud.mjs:241:ipcMain.on("popout", () => (pop ? pop.close() : openPop()));
+src/gesture/hud.mjs:262:ipcMain.on("chat", (_e, d) => {
+src/main/main.mjs:490:ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, persona: loadPersona(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })), plugins: loadPlugins(home) } }));
+src/main/main.mjs:491:ipcMain.handle("persona:set", (_e, text) => savePersona(home, text));
+src/main/main.mjs:492:ipcMain.handle("skills:open", () => {
+src/main/main.mjs:497:ipcMain.handle("plugins:open", () => {
+src/main/main.mjs:512:ipcMain.handle("plugins:scan-folder", async (e) => {
+src/main/main.mjs:519:ipcMain.handle("plugins:scan-url", async (_e, url) => {
+src/main/main.mjs:540:ipcMain.handle("plugins:install", (_e, picks) => {
+src/main/main.mjs:556:ipcMain.handle("plugins:list", () => listPlugins());
+src/main/main.mjs:558:ipcMain.handle("plugins:run-now", (_e, id) => (typeof id === "string" && hooks ? hooks.runNow(id) : "no session"));
+src/main/main.mjs:560:ipcMain.handle("plugins:trust", (_e, name) => {
+src/main/main.mjs:569:ipcMain.handle("plugins:remove", async (e, name) => {
+src/main/main.mjs:592:ipcMain.handle("config:plugin", (_e, patch) => {
+src/main/main.mjs:605:ipcMain.handle("config:lang", (_e, lang) => writeConfig({ ...readConfig(), lang })); // UI + Gemini language; clean() drops unknown values
+src/main/main.mjs:606:ipcMain.handle("config:mic", (_e, mic) => {
+src/main/main.mjs:610:ipcMain.handle("config:keep", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, keep: on !== false } })); // clean() keeps only a boolean
+src/main/main.mjs:611:ipcMain.handle("config:compose", (_e, on) => writeConfig({ ...readConfig(), compose: on !== false }));
+src/main/main.mjs:612:ipcMain.handle("config:announce", (_e, on) => writeConfig({ ...readConfig(), announce: on !== false }));
+src/main/main.mjs:613:ipcMain.handle("config:meter", (_e, on) => writeConfig({ ...readConfig(), session: { ...readConfig().session, meter: on !== false } }));
+src/main/main.mjs:614:ipcMain.handle("config:name", (_e, name) => writeConfig({ ...readConfig(), name })); // clean() keeps one short plain line
+src/main/main.mjs:615:ipcMain.handle("config:greet", (_e, on) => writeConfig({ ...readConfig(), greet: on !== false }));
+src/main/main.mjs:616:ipcMain.handle("config:welcomed", () => writeConfig({ ...readConfig(), welcomed: true }));
+src/main/main.mjs:618:ipcMain.handle("key:save", async (_e, key) => {
+src/main/main.mjs:636:ipcMain.handle("live:start", (_e, opts) => startLive(opts));
+src/main/main.mjs:637:ipcMain.handle("live:stop", () => stopLive());
+src/main/main.mjs:638:ipcMain.on("live:clear", () => clearContext());
+src/main/main.mjs:640:ipcMain.handle("live:input", (_e, parts, meta) => {
+src/main/main.mjs:651:ipcMain.handle("live:state", () => ({ status: liveStatus, muted, listenOnly }));
+src/main/main.mjs:652:ipcMain.handle("live:history", () => history);
+src/main/main.mjs:653:ipcMain.on("iris:toggle", () => win && !win.isDestroyed() && win.webContents.send("iris:toggle"));
+src/main/main.mjs:654:ipcMain.on("iris:mute", (_e, on) => {
+src/main/main.mjs:658:ipcMain.on("iris:listen", (_e, on) => session && setListenOnly(on === true)); // only while Iris runs, like the buttons
+src/main/main.mjs:659:ipcMain.on("live:audio-in", (_e, arrayBuffer) => {
+src/main/main.mjs:712:ipcMain.handle("gallery:open", async (_e, target = os.homedir()) => {
+src/main/main.mjs:720:ipcMain.on("gallery:close", () => (setGallery(null), lookAt("")));
+src/main/main.mjs:722:ipcMain.handle("gallery:item", async (_e, i) => {
+src/main/main.mjs:733:ipcMain.handle("gallery:send", (_e, i) => {
+src/main/main.mjs:743:ipcMain.on("gallery:look", (_e, i) => lookAt((Number.isInteger(i) && IMAGE_EXT.test(galleryEntries[i] ?? "") && galleryEntries[i]) || ""));
+
+# preload calls
+3:const on = (channel) => (cb) => ipcRenderer.on(channel, (_e, payload) => cb(payload));
+6:  getConfig: () => ipcRenderer.invoke("config:get"),
+7:  saveKey: (key) => ipcRenderer.invoke("key:save", key), // checked against Gemini first; "" or an error text
+8:  saveWelcomed: () => ipcRenderer.invoke("config:welcomed"),
+9:  saveLang: (lang) => ipcRenderer.invoke("config:lang", lang),
+10:  saveKeep: (on) => ipcRenderer.invoke("config:keep", on), // Features › Giữ phiên dài → config.session.keep
+11:  saveMeter: (on) => ipcRenderer.invoke("config:meter", on), // Features › Hiện mức context → config.session.meter
+12:  saveCompose: (on) => ipcRenderer.invoke("config:compose", on), // Features › Gõ chữ, gửi ảnh và tệp → config.compose
+13:  saveAnnounce: (on) => ipcRenderer.invoke("config:announce", on), // Features › System Announcements → config.announce
+14:  saveMic: (mic) => ipcRenderer.invoke("config:mic", mic), // { id, label } or null = system default
+15:  savePersona: (text) => ipcRenderer.invoke("persona:set", text), // ~/.open-iris/IRIS.md, Iris's tone
+16:  saveName: (name) => ipcRenderer.invoke("config:name", name), // what Iris calls the user → config.name
+17:  saveGreet: (on) => ipcRenderer.invoke("config:greet", on), // Iris greets at Start → config.greet
+18:  openSkills: () => ipcRenderer.invoke("skills:open"), // "" or an error text
+19:  openPlugins: () => ipcRenderer.invoke("plugins:open"), // ~/.open-iris/plugins; "" or an error text
+20:  scanPluginFolder: () => ipcRenderer.invoke("plugins:scan-folder"), // folder picker → { source, plugins } or { canceled }
+21:  scanPluginUrl: (url) => ipcRenderer.invoke("plugins:scan-url", url), // git clone --depth 1 of a GitHub link → { source, plugins }
+22:  installPlugins: (picks) => ipcRenderer.invoke("plugins:install", picks), // ticked scan paths ([] cancels) → { installed, errors }
+23:  savePlugin: (patch) => ipcRenderer.invoke("config:plugin", patch), // { name, on?, fields?, groups?: { [group]: { on?, every_min? } } }
+24:  listPlugins: () => ipcRenderer.invoke("plugins:list"), // Plugin tab cards; main rebuilds it on every call
+25:  runHookNow: (id) => ipcRenderer.invoke("plugins:run-now", id), // Tick group "plugin/group" → "" or why it did not run
+26:  removePlugin: (name) => ipcRenderer.invoke("plugins:remove", name), // main asks first → true if removed
+27:  trustPlugin: (name) => ipcRenderer.invoke("plugins:trust", name), // main hashes the folder into ~/.open-iris/trust.json
+28:  start: (opts) => ipcRenderer.invoke("live:start", opts),
+29:  stop: () => ipcRenderer.invoke("live:stop"),
+30:  sendAudio: (arrayBuffer) => ipcRenderer.send("live:audio-in", arrayBuffer),
+33:  openGallery: (file) => ipcRenderer.invoke("gallery:open", file && webUtils.getPathForFile(file)),
+34:  closeGallery: () => ipcRenderer.send("gallery:close"),
+35:  galleryEnabled: (on) => ipcRenderer.send("gallery:enabled", on), // Features switch → HUD 🖼 button
+37:  orbEnabled: (on) => ipcRenderer.send("orb:enabled", on), // Features › Orb switch → HUD orb
+39:  orb: (input) => ipcRenderer.send("orb", input), // main window → HUD orb
+42:  galleryItem: (index) => ipcRenderer.invoke("gallery:item", index), // folder: go in, other file: open in its app
+43:  gallerySend: (index) => ipcRenderer.invoke("gallery:send", index), // Send to Iris: path only, silent; false if Iris is not running
+44:  galleryLook: (index) => ipcRenderer.send("gallery:look", index), // image in the viewer (-1 = none), for Iris
+50:  getHistory: () => ipcRenderer.invoke("live:history"), // recent live:event payloads kept in main memory (chat window)
+52:  sendInput: (parts, meta) => ipcRenderer.invoke("live:input", parts, meta), // typed turn ({ text, files: [{ name, kind }] } for the conversation) → true if sent
+53:  clearContext: () => ipcRenderer.send("live:clear"), // "↺ Làm mới": a new session, same setup, mic and 👂 kept
+55:  toggle: () => ipcRenderer.send("iris:toggle"),
+57:  mute: (on) => ipcRenderer.send("iris:mute", on),
+59:  listen: (on) => ipcRenderer.send("iris:listen", on), // listen-only: Iris hears but does not speak or act
+61:  getState: () => ipcRenderer.invoke("live:state"),
+66:  mouse: (action, x, y) => ipcRenderer.send("mouse", { action, x, y }),
+67:  vision: (on, quiet) => ipcRenderer.send("vision", on, quiet), // quiet: launch auto-start and reset, no announcement (hud.mjs)
+69:  hand: (state) => ipcRenderer.send("hand", state), // engine → HUD, per frame
+71:  hudGallery: (open) => ipcRenderer.send("hud:gallery", open),
+74:  setControl: (on) => ipcRenderer.send("control:set", on),
+78:  getSettings: () => ipcRenderer.invoke("settings:get"),
+79:  setSettings: (patch) => ipcRenderer.send("settings:set", patch),
+80:  getPerms: () => ipcRenderer.invoke("perms:get"),
+81:  requestPerms: () => ipcRenderer.invoke("perms:request"),
+82:  hud: (enter) => ipcRenderer.invoke("hud", enter),
+83:  openSettings: (kind) => ipcRenderer.send("open-settings", kind),
+84:  revealHost: () => ipcRenderer.send("perms:reveal"),
+85:  interactive: (on) => ipcRenderer.send("hud:interactive", on), // HUD stops being click-through over its buttons
+86:  popout: () => ipcRenderer.send("popout"), // HUD 📷 and main window ⧉: open / close the "Iris Camera" window (hud.mjs openPop)
+88:  chat: (dock) => ipcRenderer.send("chat", dock), // HUD 💬: show / hide the chat window next to the dock rect { x, y, width, height }
+
+# BrowserWindow / webPreferences
+src/renderer/index.html:126:    <p class="warn" data-en="Commands run with your permissions and are not sandboxed: they can read and change your files. Only trust plugins whose source you know. If any file in the plugin changes, Iris asks again.">Lệnh chạy với quyền của bạn và không bị sandbox: chúng đọc, ghi được file của bạn. Chỉ tin cậy plugin bạn biết rõ nguồn. Plugin đổi bất kỳ file nào thì Iris sẽ hỏi lại.</p>
+src/gesture/hud.mjs:223:  pop = new BrowserWindow({
+src/gesture/hud.mjs:225:    webPreferences: { preload: path.join(dir, "..", "preload", "preload.cjs"), backgroundThrottling: false }, // OBS keeps getting frames behind other apps
+src/gesture/hud.mjs:251:  chat = new BrowserWindow({
+src/gesture/hud.mjs:253:    webPreferences: { preload: path.join(dir, "..", "preload", "preload.cjs") },
+src/gesture/hud.mjs:288:  win = new BrowserWindow({
+src/gesture/hud.mjs:296:    webPreferences: {
+src/main/main.mjs:788:  win = new BrowserWindow({
+src/main/main.mjs:792:    webPreferences: { preload: path.join(import.meta.dirname, "../preload/preload.cjs"), backgroundThrottling: false },
+
+# navigation guards
+src/main/main.mjs:766:  wc.setWindowOpenHandler(({ url }) => (guidePage(url, app.getAppPath()) ? { action: "allow" } : (log("WARN", "security", `window.open refused: ${url}`), { action: "deny" })));
+src/main/main.mjs:767:  wc.on("will-navigate", (e, url) => {
+
+# sinks
+src/renderer/renderer.js:139:    label.innerHTML = `<input type="checkbox" role="switch" name="${name}"> ${name}`;
+src/renderer/renderer.js:147:  ab.innerHTML = `<input type="checkbox" role="switch" name="list_my_abilities"> <span><span lang="en">list_my_abilities </span><small></small></span>`;
+src/renderer/renderer.js:154:  rs.innerHTML = `<input type="checkbox" role="switch" name="read_sent_file"> <span><span lang="en">read_sent_file </span><small></small></span>`;
+src/renderer/renderer.js:164:    // SKILL.md text is the owner's file: textContent only, never innerHTML.
+src/renderer/convo-ui.js:2:// Turns come from convo-view.mjs. textContent only, never innerHTML: transcripts and tool errors can carry screen text.
+src/gesture/hud-events.test.mjs:1:// hud.mjs runs in Electron main: a loader hook swaps in stubs for electron and child_process (no swiftc, no ps, no helper).
+src/gesture/hud-events.test.mjs:18:export const execFileSync = () => "1 stub";
+src/gesture/hud-events.test.mjs:24:  if (spec === "node:child_process" && ctx.parentURL?.endsWith("/hud.mjs")) return { url: ${JSON.stringify(url(child))}, shortCircuit: true };
+src/gesture/hud.mjs:10:import { spawn, execFileSync } from "node:child_process";
+src/gesture/hud.mjs:34:      execFileSync("swiftc", ["-O", src, "-o", bin], { stdio: "inherit" });
+src/gesture/hud.mjs:45:  mouse = spawn(bin, [], { stdio: ["pipe", "pipe", "inherit"] });
+src/gesture/hud.mjs:137:    const [ppid, ...comm] = execFileSync("ps", ["-o", "ppid=,comm=", "-p", String(pid)], { encoding: "utf8" }).trim().split(/\s+/);
+src/gesture/hud.mjs:166:  if (PANES[kind]) shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${PANES[kind]}`);
+src/main/hooks.mjs:8:import { spawn as nodeSpawn } from "node:child_process";
+src/main/hooks.mjs:322:      child = spawn("/bin/sh", ["-c", command], { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
+src/main/hooks.mjs:468:    child = spawn("/bin/sh", ["-c", command], { cwd, env, stdio: ["pipe", "pipe", "pipe"], detached: true });
+src/main/examples.selftest.mjs:4:import { execFileSync, spawnSync } from "node:child_process";
+src/main/examples.selftest.mjs:92:  execFileSync("cp", ["-R", path.join(repo, "examples/plugins/speak-tick"), broken]);
+src/main/main.mjs:10:import { execFile } from "node:child_process";
+src/main/main.mjs:30:const execFileP = promisify(execFile);
+src/main/main.mjs:277:  // shortcut: a cancelled call still runs to the end; its response is just not sent. Abort execFile if that matters.
+src/main/main.mjs:526:    await execFileP("git", ["clone", "--depth", "1", ...(gh.branch ? ["--branch", gh.branch] : []), "--", gh.repo, clone], { timeout: 120_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+src/main/desktop.mjs:5:import { execFile } from "node:child_process";
+src/main/desktop.mjs:348:    const child = execFile(BIN, argv, { timeout: 60000, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {

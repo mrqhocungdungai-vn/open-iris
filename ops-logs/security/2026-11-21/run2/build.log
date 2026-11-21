@@ -1,0 +1,12 @@
+$ electron-packager . open-iris --icon=assets/icon.icns --app-bundle-id=com.open-iris.app --app-version=0.1.0 --no-asar --no-prune --out=out --overwrite --ignore='^/(\.env|\.hallmark|\.agents|\.claude|docs|eval|node_modules/(\.pnpm/)?(electron|@electron)[^/]*)($|/)' && electron-fuses write --app out/open-iris-darwin-arm64/open-iris.app RunAsNode=off EnableNodeOptionsEnvironmentVariable=off EnableNodeCliInspectArguments=off && codesign --force --deep --sign - out/open-iris-darwin-arm64/open-iris.app
+Packaging app for platform darwin arm64 using electron v42.5.0
+WARNING: Could not find icon "assets/icon.icns" with extension ".icon", skipping this app icon format
+Wrote new app to: out/open-iris-darwin-arm64
+Analyzing app: open-iris.app
+Fuse Version: v1
+  RunAsNode is Enabled and will become Disabled
+  EnableNodeOptionsEnvironmentVariable is Enabled and will become Disabled
+  EnableNodeCliInspectArguments is Enabled and will become Disabled
+Writing to app: open-iris.app
+Fuses written to disk
+out/open-iris-darwin-arm64/open-iris.app: replacing existing signature

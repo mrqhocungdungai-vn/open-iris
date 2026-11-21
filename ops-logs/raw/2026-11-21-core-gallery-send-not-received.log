@@ -1,0 +1,50 @@
+2026-11-21T10:00:31.136Z [INFO] [live] connecting model=models/gemini-3.8-live voice=Zephyr lang=vi tools=list_running_apps,open_or_focus_app,scan_app_controls,find_app_control,read_app_text,click_app_control,pick_list_option,type_into_text_field,press_key_combo,scroll_app_view,close_app,read_sent_file,list_my_abilities plugins=none
+2026-11-21T10:00:31.343Z [INFO] [live] connected
+2026-11-21T10:00:31.804Z [INFO] [perf] V3 start ms=671 model=models/gemini-3.8-live
+2026-11-21T10:00:32.594Z [INFO] [turn] speaking (audio/pcm;rate=24000)
+2026-11-21T10:00:33.254Z [INFO] [live] listen-only on
+2026-11-21T10:00:34.660Z [INFO] [gallery] opened ~ entries=16 shown=16
+2026-11-21T10:00:34.660Z [INFO] [app] overlay open
+2026-11-21T10:00:36.529Z [INFO] [perf] mic peakRms=5454 voice=182/626
+2026-11-21T10:00:41.545Z [INFO] [perf] mic peakRms=3696 voice=69/627
+2026-11-21T10:00:46.561Z [INFO] [perf] mic peakRms=2081 voice=49/627
+2026-11-21T10:00:51.577Z [INFO] [perf] mic peakRms=838 voice=7/628
+2026-11-21T10:00:56.499Z [INFO] [gallery] opened ~/photo entries=11 shown=11
+2026-11-21T10:00:56.586Z [INFO] [perf] mic peakRms=605 voice=7/622
+2026-11-21T10:01:01.588Z [INFO] [perf] mic peakRms=733 voice=10/630
+2026-11-21T10:01:03.331Z [INFO] [gallery] sent image ~/photo/<redacted>.jpg
+2026-11-21T10:01:06.592Z [INFO] [perf] mic peakRms=810 voice=12/624
+2026-11-21T10:01:08.552Z [INFO] [app] overlay closed
+2026-11-21T10:01:11.478Z [INFO] [live] listen-only off
+2026-11-21T10:01:11.604Z [INFO] [perf] mic peakRms=408 voice=0/627
+2026-11-21T10:01:16.618Z [INFO] [perf] mic peakRms=355 voice=0/627
+2026-11-21T10:01:21.620Z [INFO] [perf] mic peakRms=1212 voice=47/626
+2026-11-21T10:01:26.625Z [INFO] [perf] mic peakRms=482 voice=0/624
+2026-11-21T10:01:31.642Z [INFO] [perf] mic peakRms=973 voice=47/627
+2026-11-21T10:01:32.205Z [INFO] [gallery] opened ~ entries=16 shown=16
+2026-11-21T10:01:32.205Z [INFO] [app] overlay open
+2026-11-21T10:01:36.657Z [INFO] [perf] mic peakRms=574 voice=4/627
+2026-11-21T10:01:41.673Z [INFO] [perf] mic peakRms=1026 voice=58/627
+2026-11-21T10:01:41.804Z [WARN] [live] deaf session: 4.0s voice, no transcript, model=models/gemini-3.8-live plugins=none try=1
+2026-11-21T10:01:41.805Z [INFO] [live] deaf requested
+2026-11-21T10:01:41.870Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=8787
+2026-11-21T10:01:42.061Z [INFO] [live] connected
+2026-11-21T10:01:42.498Z [INFO] [perf] V3 deaf ms=693 model=models/gemini-3.8-live
+2026-11-21T10:01:46.690Z [INFO] [perf] mic peakRms=2026 voice=63/596
+2026-11-21T10:01:48.177Z [INFO] [gallery] opened ~/photo entries=11 shown=11
+2026-11-21T10:01:51.705Z [INFO] [perf] mic peakRms=905 voice=21/627
+2026-11-21T10:01:56.722Z [INFO] [perf] mic peakRms=3816 voice=67/627
+2026-11-21T10:01:58.381Z [INFO] [gallery] sent image ~/photo/<redacted>.jpg
+2026-11-21T10:02:01.735Z [INFO] [perf] mic peakRms=4087 voice=178/628
+2026-11-21T10:02:02.801Z [INFO] [app] overlay closed
+2026-11-21T10:02:04.916Z [WARN] [live] deaf session: 4.0s voice, no transcript, model=models/gemini-3.8-live plugins=none try=2
+2026-11-21T10:02:04.916Z [INFO] [live] deaf requested
+2026-11-21T10:02:04.983Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=11645
+2026-11-21T10:02:05.107Z [INFO] [live] connected
+2026-11-21T10:02:05.605Z [INFO] [perf] V3 deaf ms=688 model=models/gemini-3.8-live
+2026-11-21T10:02:06.743Z [INFO] [perf] mic peakRms=9383 voice=179/603
+2026-11-21T10:02:11.748Z [INFO] [perf] mic peakRms=4265 voice=160/626
+2026-11-21T10:02:16.752Z [INFO] [perf] mic peakRms=3442 voice=125/624
+2026-11-21T10:02:17.610Z [INFO] [turn] complete, 18 audio chunks
+2026-11-21T10:02:19.318Z [INFO] [live] stop requested
+2026-11-21T10:02:19.386Z [INFO] [live] closed code=1000 reason=(none) micChunksSent=13421
