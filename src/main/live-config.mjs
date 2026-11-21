@@ -55,7 +55,7 @@ export function abilitiesTool(tools, off = []) {
     ...(off.length ? [`Switched off in Settings (the user can turn them on): ${off.join(", ")}.`] : []),
     "Parts of open-iris the user runs without you (explain, never operate):",
     "- Hand control: the camera moves the mouse, and hand gestures click and scroll.",
-    "- open-iris Gallery View: files and images shown as cards to browse by hand. Call it Gallery View, it is not the Photos app.",
+    "- open-iris Gallery View: files and images shown as cards to browse by hand. Call it Gallery View, it is not the Photos app. Its Send to Iris button gives you a file's path.",
   ].join("\n");
   return {
     name: ABILITIES,

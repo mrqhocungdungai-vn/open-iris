@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld("iris", {
   onOrb: on("orb"),
   onGallery: on("gallery"),
   galleryItem: (index) => ipcRenderer.invoke("gallery:item", index), // folder: go in, other file: open in its app
+  gallerySend: (index) => ipcRenderer.invoke("gallery:send", index), // Send to Iris: path only, silent; false if Iris is not running
   galleryLook: (index) => ipcRenderer.send("gallery:look", index), // image in the viewer (-1 = none), for Iris
   onAudio: on("live:audio"),
   onInterrupt: on("live:interrupt"),
