@@ -3,7 +3,7 @@
 // to the HUD overlay (if open) for its cursor ring, pose line and camera skeleton.
 import { DrawingUtils, FilesetResolver, HandLandmarker } from "../../node_modules/@mediapipe/tasks-vision/vision_bundle.mjs";
 import { cursorFrom, smooth, isPinched, isScrollPose, pinchRatio, clickLock, CLICK_HOLD_MS, isFist, isRock, isThumbUp, palmsOf, LOCK_HOLD_MS, pinchApproach, trackpad, glide, GLIDE_MIN, settle, scrollStep } from "./hand.js";
-import { deviceConstraint } from "../renderer/devices.js";
+import { openVideo } from "../renderer/devices.js";
 import { handPerfLine } from "./perf.js";
 
 const $ = (id) => document.getElementById(id);
@@ -107,7 +107,7 @@ async function start() {
 
 async function openCamera() {
   video.srcObject?.getTracks().forEach((t) => t.stop());
-  video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, ...deviceConstraint(cam) } });
+  video.srcObject = await openVideo({ width: 640, height: 480 }, cam);
   await video.play();
   console.info(`hand vision: camera "${video.srcObject.getVideoTracks()[0]?.label}"`);
   document.dispatchEvent(new Event("devicesused")); // devices.js: labels are readable now

@@ -1,7 +1,7 @@
 // HUD display only: tracking runs in the main window (engine.js), which sends its state here every frame via main ("hand").
 // The camera preview (⌃⌥C) is this window's own stream of the same camera, open only while vision is on.
 import { DrawingUtils, HandLandmarker } from "../../node_modules/@mediapipe/tasks-vision/vision_bundle.mjs";
-import { deviceConstraint } from "../renderer/devices.js";
+import { openVideo } from "../renderer/devices.js";
 
 const $ = (id) => document.getElementById(id);
 // Work-area insets from hud.mjs, so the corner panels stay off the menu bar and Dock.
@@ -21,7 +21,7 @@ async function syncCamera() {
   const want = wanted();
   $("view").hidden = !want;
   if (want && !stream) {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, ...deviceConstraint(cam) } });
+    stream = await openVideo({ width: 640, height: 480 }, cam);
     if (!wanted()) return syncCamera(); // switched off while the camera was opening
     $("cam").srcObject = stream;
   } else if (!want && stream) {
