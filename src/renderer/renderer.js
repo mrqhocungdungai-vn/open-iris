@@ -9,11 +9,13 @@ function setLang(lang) {
     el.dataset.vi ??= el.textContent;
     el.textContent = tr(el.dataset.vi, el.dataset.en);
   }
-  for (const a of ["title", "aria-label", "placeholder", "data-empty"])
-    for (const el of document.querySelectorAll(`[data-en-${a}]`)) {
-      if (!el.hasAttribute(`data-vi-${a}`)) el.setAttribute(`data-vi-${a}`, el.getAttribute(a));
-      el.setAttribute(a, tr(el.getAttribute(`data-vi-${a}`), el.getAttribute(`data-en-${a}`)));
+  for (const a of ["title", "aria-label", "placeholder", "data-empty"]) {
+    const k = a.replace(/^data-/, ""); // data-empty's English is in data-en-empty, not data-en-data-empty
+    for (const el of document.querySelectorAll(`[data-en-${k}]`)) {
+      if (!el.hasAttribute(`data-vi-${k}`)) el.setAttribute(`data-vi-${k}`, el.getAttribute(a));
+      el.setAttribute(a, tr(el.getAttribute(`data-vi-${k}`), el.getAttribute(`data-en-${k}`)));
     }
+  }
   document.dispatchEvent(new Event("langchange")); // dynamic text re-renders itself
 }
 // Start problems go next to the Start button, in words the user can act on; the raw line still goes to the conversation.
@@ -146,6 +148,13 @@ config.then((c) => {
   ab.firstChild.checked = c.abilities;
   say(ab.querySelector("small"), "Khi bạn hỏi \"em làm được gì\", Iris kể đủ tool đang bật, tool đang tắt, điều khiển bằng tay và Gallery View.", "When you ask what Iris can do, it lists every tool that is on, the ones that are off, hand control and Gallery View.");
   $("tools").append(say(document.createElement("strong"), "Iris tự giới thiệu", "Iris about itself"), ab);
+  // read_sent_file: Gallery Send to Iris content tool, same pattern (opts.tools at Start → config.readSent).
+  const rs = document.createElement("label");
+  rs.className = "feature";
+  rs.innerHTML = `<input type="checkbox" role="switch" name="read_sent_file"> <span><span lang="en">read_sent_file </span><small></small></span>`;
+  rs.firstChild.checked = c.readSent;
+  say(rs.querySelector("small"), "Khi bạn gửi tệp bằng Send to Iris và hỏi về nó, Iris có thể xem ảnh hoặc đọc tệp chữ. Chỉ tệp bạn đã gửi.", "When you send a file with Send to Iris and ask about it, Iris can look at the image or read the text file. Only files you sent.");
+  $("tools").append(say(document.createElement("strong"), "Gallery View", "Gallery View"), rs);
   $("owner").value = c.persona;
   $("name").value = c.name;
   $("greet").checked = c.greet;
