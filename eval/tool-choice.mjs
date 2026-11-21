@@ -22,7 +22,15 @@ const CASES = [
   { say: "Trong Pages chọn cỡ chữ 14 ở ô cỡ chữ", expect: ["find_app_control"] },
   { say: "Trong Telegram tìm kênh Mai o ở ô tìm kiếm", expect: ["find_app_control"] }, // log 2026-11-20: role "search field" was refused
   { say: "Nhấn cmd n trong Notes để tạo ghi chú mới", expect: ["press_key_combo"] },
-  { say: "Tắt Visual Studio Code đi", expect: ["find_app_control", "scan_app_controls"] }, // log 2026-11-20: cmd+q is blocked, click close instead
+  { say: "Tắt Visual Studio Code đi", expect: ["close_app"] }, // log 2026-11-20: cmd+q is blocked; close_app since 2026-11-21
+  { say: "Thoát Spotify", expect: ["close_app"] },
+  // A scroll needs the scrollarea's ref, so finding or scanning it first is a right first call too.
+  { say: "Cuộn xuống trong Safari", expect: ["scroll_app_view", "scan_app_controls", "find_app_control"] },
+  { say: "Trong Safari, đọc tiếp phần dưới", expect: ["scroll_app_view", "scan_app_controls", "find_app_control"] },
+  // surface: the first call must also pass this surface.
+  { say: "Mở menu File của TextEdit", expect: ["find_app_control", "scan_app_controls"], surface: "menubar" },
+  // find_app_control falls back to surface focused by itself, so no surface is required here.
+  { say: "TextEdit đang hiện hộp thoại hỏi lưu file, bấm Don't Save", expect: ["find_app_control", "scan_app_controls"] },
   { say: "Safari đang hiện những nút gì?", expect: ["scan_app_controls", "read_app_text"] },
   { say: "Tìm hiểu giúp mình giá vàng hôm nay", expect: ["open_or_focus_app", "list_running_apps", []] }, // the brief says ask which app when unsure
   { say: "Đọc màn hình terminal cho mình", expect: [[]] }, // app tools never read a terminal
@@ -68,7 +76,7 @@ async function firstMove({ say, expect }) {
   return r;
 }
 
-const ok = (c, r) => !r.error && c.expect.some((e) => (Array.isArray(e) ? r.calls.length === 0 : r.calls[0]?.name === e));
+const ok = (c, r) => !r.error && c.expect.some((e) => (Array.isArray(e) ? r.calls.length === 0 : r.calls[0]?.name === e)) && (!c.surface || r.calls[0]?.args?.surface === c.surface);
 const picked = opt.case ? [CASES[Number(opt.case) - 1]] : CASES;
 const runs = Number(opt.runs);
 console.log(`model=${opt.model} tools=${enabled.length} cases=${picked.length} runs=${runs}`);

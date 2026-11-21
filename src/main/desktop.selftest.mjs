@@ -1,6 +1,6 @@
 // Self-check for desktop.mjs with a fake agent-desktop CLI: node desktop.selftest.mjs (part of pnpm test).
 import assert from "node:assert/strict";
-import { cleanTools, desktopTools, TOOL_DEFAULTS, treeText } from "./desktop.mjs";
+import { cleanTools, desktopTools, DESKTOP_BRIEF, TOOL_DEFAULTS, treeText } from "./desktop.mjs";
 
 // cli(argv, stdin) answers from a list of handlers; every call is recorded.
 function fake(answer) {
@@ -164,11 +164,162 @@ for (const t of desktopTools()) assert.ok(t.desktop && t.parameters.type === "ob
   const f = fake(() => ({ ok: true, data: { disposition: { delivery: "delivered_unverified" } } }));
   assert.match((await f.run("press_key_combo", { combo: "cmd+f", app: "Safari" })).output.verify, /read_app_text/);
 }
+// close_app always asks first, never forces, and passes on the surfaces an action reports.
+{
+  const f = fake(() => ({ ok: true, data: { surfaces: [{ id: "focused-window", type: "sheet" }] } }));
+  assert.equal((await f.run("close_app", { app: "Spotify", confirmed: true })).error.code, "NEEDS_CONFIRMATION");
+  assert.equal(f.calls.length, 0);
+  const r = await f.run("close_app", { app: "Spotify", confirmed: true });
+  assert.deepEqual(f.calls.map((c) => c.argv), [["close-app", "Spotify"]]);
+  assert.equal(r.output.data.surfaces[0].type, "sheet");
+  // The yes covers one quit.
+  assert.equal((await f.run("close_app", { app: "Spotify", confirmed: true })).error.code, "NEEDS_CONFIRMATION");
+}
+// open-iris itself and terminals are never closed, not even after a yes.
+for (const app of ["open-iris", "Electron", "Terminal", "iTerm2", "Warp", " ghostty "]) {
+  const f = fake(() => null);
+  assert.equal((await f.run("close_app", { app })).error.code, "NOT_ALLOWED", app);
+  assert.equal((await f.run("close_app", { app, confirmed: true })).error.code, "NOT_ALLOWED", app);
+  assert.equal(f.calls.length, 0);
+}
+// Bundle ids name an app too (list-windows --app com.apple.finder resolves), and list_running_apps shows them to Gemini.
+for (const app of ["com.apple.Terminal", "com.googlecode.iterm2", "com.github.Electron", "com.open-iris.app", "dev.warp.Warp-Stable", "com.mitchellh.ghostty"]) {
+  const f = fake(() => null);
+  assert.equal((await f.run("close_app", { app })).error.code, "NOT_ALLOWED", app);
+  assert.equal((await f.run("close_app", { app, confirmed: true })).error.code, "NOT_ALLOWED", app);
+  assert.equal(f.calls.length, 0);
+}
+assert.equal((await fake(() => null).run("close_app", { app: "com.spotify.client" })).error.code, "NEEDS_CONFIRMATION");
+// The menubar's Quit item is a second way to quit: the same apps are refused there, even after a yes.
+for (const label of ["Quit Terminal", "Quit open-iris", "Quit Electron", "Quit iTerm2"]) {
+  const f = fake((a) => (a[0] === "get" ? { ok: true, data: label } : null));
+  assert.equal((await f.run("click_app_control", { ref: "@m:e9" })).error.code, "NOT_ALLOWED", label);
+  assert.equal((await f.run("click_app_control", { ref: "@m:e9", confirmed: true })).error.code, "NOT_ALLOWED", label);
+  assert.ok(!f.calls.some((c) => c.argv[0] === "click"), label);
+}
+assert.equal((await fake((a) => (a[0] === "get" ? { ok: true, data: "Quit TextEdit" } : null)).runYes("click_app_control", { ref: "@m:e9" })).ok, true);
+// cmd+d and cmd+delete pick Don't Save in a macOS save alert, so they ask like return.
+for (const combo of ["cmd+d", "Cmd+D", "cmd+delete", "cmd+backspace", "command+d"]) {
+  const f = fake(() => null);
+  assert.equal((await f.run("press_key_combo", { combo, app: "TextEdit" })).error.code, "NEEDS_CONFIRMATION", combo);
+  assert.equal(f.calls.length, 0, combo);
+  assert.equal((await f.run("press_key_combo", { combo, app: "TextEdit", confirmed: true })).ok, true, combo);
+}
+// Unsaved docs: close-app times out with an alert open, and the tool says so with the surfaces (TextEdit probe, 2026-11-21).
+{
+  const f = fake((a) => (a[0] === "close-app" ? { ok: false, error: { code: "TIMEOUT" } } : a[0] === "list-surfaces" ? { ok: true, data: { surfaces: [{ id: "focused-window", title: "", type: "alert" }] } } : null));
+  const r = await f.runYes("close_app", { app: "TextEdit" });
+  assert.equal(r.error.code, "DIALOG_OPEN");
+  assert.equal(r.error.surfaces[0].type, "alert");
+  assert.deepEqual(f.calls.map((c) => c.argv), [["close-app", "TextEdit"], ["list-surfaces", "--app", "TextEdit"]]);
+  assert.ok(!f.calls.some((c) => c.argv.includes("--force")));
+  // A timeout with no dialog goes back as it is.
+  const g = fake((a) => (a[0] === "close-app" ? { ok: false, error: { code: "TIMEOUT" } } : null));
+  assert.equal((await g.runYes("close_app", { app: "TextEdit" })).error.code, "TIMEOUT");
+}
+// scroll_app_view: headless only, amount defaults to 3 and is clamped to 1..20, unknown directions never reach the CLI.
+{
+  const f = fake(() => null);
+  for (const [amount, n] of [[undefined, "3"], [0.4, "1"], [99, "20"], ["7", "7"]]) {
+    assert.equal((await f.run("scroll_app_view", { app: "Safari", ref: "@s:e1", direction: "down", amount })).ok, true);
+    assert.deepEqual(f.calls.at(-1).argv, ["scroll", "@s:e1", "--direction", "down", "--amount", n]);
+  }
+  assert.ok(!f.calls.some((c) => c.argv.includes("--headed")));
+  const before = f.calls.length;
+  assert.equal((await f.run("scroll_app_view", { app: "Safari", ref: "@s:e1", direction: "sideways" })).error.code, "INVALID_ARGS");
+  assert.match((await f.run("scroll_app_view", { app: "Safari", ref: "", direction: "down" })).error.message, /scan_app_controls/);
+  assert.equal(f.calls.length, before);
+}
+// A scroll that was not delivered and is safe to retry is tried once more; an unsafe one goes back as it is.
+{
+  const err = (retry) => ({ ok: false, error: { code: "ACTION_FAILED", disposition: { delivery: "not_delivered", retry } } });
+  let n = 0;
+  const f = fake(() => (n++ ? null : err("safe")));
+  assert.equal((await f.run("scroll_app_view", { app: "Safari", ref: "@s:e1", direction: "up" })).ok, true);
+  assert.equal(f.calls.length, 2);
+  const g = fake(() => err("safe"));
+  assert.equal((await g.run("scroll_app_view", { app: "Safari", ref: "@s:e1", direction: "up" })).error.code, "ACTION_FAILED");
+  assert.equal(g.calls.length, 2);
+  const h = fake(() => err("unsafe"));
+  await h.run("scroll_app_view", { app: "Safari", ref: "@s:e1", direction: "up" });
+  assert.equal(h.calls.length, 1);
+}
+// Switched off, scroll_app_view is not offered (main.mjs offers only tools whose switch is on).
+assert.equal(cleanTools({ scroll_app_view: false }).scroll_app_view, false);
+assert.match(DESKTOP_BRIEF, /scroll_app_view/);
+// The cmd+q hint points to close_app, not to a close button.
+assert.match(desktopTools().find((t) => t.name === "press_key_combo").description, /close_app/);
+// surface: argv per tool, never with --root or --skeleton; surface+root and unknown surfaces never reach the CLI.
+{
+  const f = fake(() => null);
+  await f.run("scan_app_controls", { app: "TextEdit", surface: "sheet" });
+  assert.deepEqual(f.calls.at(-1).argv, ["snapshot", "--app", "TextEdit", "-i", "--compact", "--surface", "sheet"]);
+  await f.run("find_app_control", { app: "TextEdit", surface: "focused", role: "button", text: "Cancel" });
+  assert.deepEqual(f.calls.at(-1).argv, ["find", "--app", "TextEdit", "--surface", "focused", "--role", "button", "--text", "Cancel"]);
+  await f.run("read_app_text", { app: "TextEdit", surface: "focused" });
+  assert.deepEqual(f.calls.at(-1).argv, ["snapshot", "--app", "TextEdit", "--compact", "--max-depth", "50", "--surface", "focused"]);
+  const before = f.calls.length;
+  assert.match((await f.run("scan_app_controls", { app: "TextEdit", surface: "sheet", root: "@s:e1" })).error.message, /not both/);
+  // System-wide surfaces (notification-center ...) would read outside the named app.
+  assert.equal((await f.run("read_app_text", { app: "TextEdit", surface: "notification-center" })).error.code, "INVALID_ARGS");
+  assert.equal(f.calls.length, before);
+}
+// find in the menubar filters a snapshot, since find --surface menubar times out (TextEdit probe, 2026-11-21).
+{
+  const tree = { role: "menu", children: [{ role: "menuitem", name: "File", ref_id: "@m:e1", children: [
+    { role: "menuitem", name: "New", ref_id: "@m:e2" }, { role: "menuitem", name: "Save…", ref_id: "@m:e3", states: ["disabled"] }] }] };
+  const f = fake((a) => (a[0] === "snapshot" ? { ok: true, data: { tree } } : null));
+  const r = await f.run("find_app_control", { app: "TextEdit", surface: "menubar", text: "save" });
+  assert.deepEqual(f.calls.map((c) => c.argv), [["snapshot", "--app", "TextEdit", "-i", "--compact", "--surface", "menubar"]]);
+  assert.deepEqual(r.output.data.matches, [{ ref_id: "@m:e3", role: "menuitem", name: "Save…", states: ["disabled"] }]);
+  assert.equal((await f.run("find_app_control", { app: "TextEdit", surface: "menubar", role: "menuitem" })).output.data.total_matches, 3);
+}
+// A click that opened an overlay lists it on top; pick_list_option too.
+{
+  const sheet = [{ id: "focused-window", title: "save", type: "sheet" }];
+  const f = fake((a) => (a[0] === "get" ? { ok: true, data: "Save" } : { ok: true, data: { surfaces: sheet } }));
+  assert.deepEqual((await f.run("click_app_control", { ref: "@m:e3" })).output.surfaces, sheet);
+  assert.deepEqual((await f.run("pick_list_option", { ref: "@s:e4", value: "PDF" })).output.surfaces, sheet);
+  const g = fake(() => ({ ok: true, data: { surfaces: [] } }));
+  assert.equal((await g.run("pick_list_option", { ref: "@s:e4", value: "PDF" })).output.surfaces, undefined);
+}
+// Buttons in a sheet or alert that lose work still ask first; get's text is the AX label (TextEdit probe).
+for (const label of ["Delete", "Don't Save", "Don’t Save", "Save and Quit", "Discard"]) {
+  const f = fake((a) => (a[0] === "get" ? { ok: true, data: { property: "text", ref: "@a:e2", value: label } } : null));
+  assert.equal((await f.run("click_app_control", { ref: "@a:e2" })).error.code, "NEEDS_CONFIRMATION", label);
+  assert.ok(!f.calls.some((c) => c.argv[0] === "click"), label);
+}
+// Two windows: AMBIGUOUS_TARGET comes back as windows [{id, title}] only, and the second turn passes window_id (TextEdit probe, 2026-11-21).
+{
+  const candidates = [{ id: "w-5993", is_focused: false, title: "Untitled", visible: true }, { id: "w-5997", is_focused: false, title: "Gmail", visible: true }];
+  const f = fake((a) => (a.includes("--window-id") ? null : { ok: false, error: { code: "AMBIGUOUS_TARGET", message: "More than one window", suggestion: "Run 'list-windows'", details: { candidate_count: 2, candidates } } }));
+  for (const [name, argv] of [
+    ["read_app_text", ["snapshot", "--app", "Chrome", "--window-id", "w-5997", "--compact", "--max-depth", "50"]],
+    ["scan_app_controls", ["snapshot", "--app", "Chrome", "--window-id", "w-5997", "-i", "--compact", "--skeleton"]],
+    ["find_app_control", ["find", "--app", "Chrome", "--window-id", "w-5997", "--role", "button"]],
+  ]) {
+    const r = await f.run(name, { app: "Chrome", role: name === "find_app_control" ? "button" : undefined });
+    assert.deepEqual(r.error, { code: "AMBIGUOUS_TARGET", windows: [{ id: "w-5993", title: "Untitled" }, { id: "w-5997", title: "Gmail" }] }, name);
+    const id = r.error.windows.find((w) => w.title === "Gmail").id;
+    assert.equal((await f.run(name, { app: "Chrome", window_id: id, role: name === "find_app_control" ? "button" : undefined })).ok, true, name);
+    assert.deepEqual(f.calls.at(-1).argv, argv, name);
+  }
+  assert.match(DESKTOP_BRIEF, /window_id/);
+}
 // read_app_text returns plain text, without repeated lines.
 {
   const tree = { name: "Window", children: [{ name: "Hello" }, { value: "Hello" }, { name: " ", children: [{ value: "Bye" }] }] };
   assert.equal(treeText(tree), "Window\nHello\nBye");
   const f = fake(() => ({ ok: true, data: { tree } }));
   assert.equal((await f.run("read_app_text", { app: "Notes" })).output.text, "Window\nHello\nBye");
+}
+// find with no match in the window looks in the focused alert next: Gemini left surface out 3/3 (eval case 15, 2026-11-21).
+{
+  const f = fake((a) => (a[0] === "find" ? { ok: true, data: { matches: a.includes("focused") ? [{ ref: "@b:e2", name: "Delete" }] : [] } } : null));
+  const r = await f.run("find_app_control", { app: "TextEdit", text: "Delete", role: "button" });
+  assert.equal(r.output.data.matches[0].ref, "@b:e2");
+  assert.deepEqual(f.calls.at(-1).argv, ["find", "--app", "TextEdit", "--surface", "focused", "--role", "button", "--text", "Delete"]);
+  const g = fake((a) => (a.includes("focused") ? { ok: false, error: { code: "ELEMENT_NOT_FOUND" } } : { ok: true, data: { matches: [] } }));
+  assert.deepEqual((await g.run("find_app_control", { app: "TextEdit", text: "x" })).output.data.matches, []);
 }
 console.log("desktop.selftest ok");
