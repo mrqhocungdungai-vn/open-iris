@@ -73,7 +73,7 @@ export async function renewFresh(r, old, current) {
 // Silent note after a reconnect (S3): what the model cannot know from its own history. S0 showed a cut-off tool call
 // is not re-issued, and the model keeps waiting for it unless told.
 // Paths sent with Send to Iris, for a session that never saw them (fresh resume, deaf renew).
-export const sentNote = (files) => `[gallery] Earlier the user sent you ${files.join(", ")}. Wait for their next words to know what to do with it.`;
+export const sentNote = (files) => `[gallery] Earlier the user sent you ${files.map((f) => JSON.stringify(f)).join(", ")}. Wait for their next words to know what to do with it.`;
 
 // sent: only without a handle; with one the server kept the conversation, paths included.
 export function resumeNote({ handle, lost = [], listenOnly = false, looking = "", sent = [] }) {
@@ -81,7 +81,7 @@ export function resumeNote({ handle, lost = [], listenOnly = false, looking = ""
     handle ? "[session] The connection dropped and was restored; the conversation continues." : "[session] The connection dropped and you are now in a new session: the earlier conversation is lost.",
     lost.length && `The tool call(s) ${lost.join(", ")} were cut off and their results are lost; check before repeating them.`,
     listenOnly && "Listen mode is still ON.",
-    looking && `[gallery] The user is looking at the image ${looking}.`,
+    looking && `[gallery] The user is looking at the image ${JSON.stringify(looking)}.`,
     !handle && sent.length && sentNote(sent),
   ].filter(Boolean).join(" ");
 }

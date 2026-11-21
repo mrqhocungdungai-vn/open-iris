@@ -361,12 +361,12 @@ export function commandOutcome(res) {
 }
 
 // Plugin tool output (spec §12.4): no ANSI or control characters (\n and \t stay), at most TOOL_OUT_MAX characters.
-export function cleanOutput(text) {
+export function cleanOutput(text, max = TOOL_OUT_MAX) {
   return String(text)
     .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-_]/g, "")
     .replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, "")
     .replace(/SYSTEM_EVENT_HOOK|\[session\]|<\s*\/?\s*persona\s*>/gi, "") // plugin text must not pose as a core marker
-    .slice(0, TOOL_OUT_MAX);
+    .slice(0, max);
 }
 
 // The filtered, named result a plugin tool gives Gemini (spec §12.4). Core errors (plain strings, no `plugin`) stay as they are.

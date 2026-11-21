@@ -423,6 +423,7 @@ function stopLive() {
   send("live:status", "offline");
   setMuted(false);
   setListenOnly(false);
+  sentFiles.clear(); // no session store: a new Start does not carry what was sent before
 }
 // "↺ Làm mới": a new session with no handle and the same setup; mic and 👂 stay as they are, hooks keep running.
 // shortcut: SessionEnd/SessionStart do not fire, so a plugin sees one session; fire them here if a plugin needs the cut.
@@ -688,6 +689,7 @@ const GALLERY_MAX = 36; // shortcut: only the first 36 entries (folders first, b
 let galleryEntries = []; // absolute paths, same order as the cards; the renderer only ever sends an index back
 let looking = ""; // image open in the viewer, so Iris knows what "this" is
 let galleryUp = ""; // the ⬆ card's folder (last entry), never sent to Iris
+const SENT_MAX = 20;
 const sentFiles = new Set(); // paths the user sent with Send to Iris: the only files read_sent_file reads, besides `looking`
 
 function showFolder(dir, open = "") {
@@ -734,9 +736,11 @@ ipcMain.handle("gallery:send", (_e, i) => {
   const f = Number.isInteger(i) ? galleryEntries[i] : undefined; // IPC trust boundary: only an index into the list main built
   if (!session || !f || f === galleryUp) return false;
   const kind = fs.statSync(f, { throwIfNoEntry: false })?.isDirectory() ? "folder" : IMAGE_EXT.test(f) ? "image" : "file";
-  sentFiles.add(f);
   log("INFO", "gallery", `sent ${kind} ${f}`);
-  if (!sendParts([{ text: `[gallery] The user sent you ${kind} ${f}. Wait for their next words to know what to do with it.` }])) return false;
+  if (!sendParts([{ text: `[gallery] The user sent you ${kind} ${JSON.stringify(f)}. Wait for their next words to know what to do with it.` }])) return false;
+  sentFiles.delete(f); // re-sent moves to newest
+  sentFiles.add(f);
+  if (sentFiles.size > SENT_MAX) sentFiles.delete(sentFiles.values().next().value); // drop the oldest
   send("live:event", { type: "TEXT_MESSAGE_CONTENT", role: "user", via: "gallery", delta: "", files: [{ name: path.basename(f), kind }] }); // the chat shows what was sent
   return true;
 });
@@ -751,7 +755,7 @@ function lookAt(file) {
 function tellLooking() {
   if (!session) return; // connectLive sends it on connect
   log("INFO", "gallery", `looking at ${looking || "(nothing)"}`);
-  sendParts([{ text: looking ? `[gallery] The user is now looking at the image ${looking}` : "[gallery] The user closed the image." }]);
+  sendParts([{ text: looking ? `[gallery] The user is now looking at the image ${JSON.stringify(looking)}` : "[gallery] The user closed the image." }]);
 }
 function sendParts(parts) {
   try { session.sendClientContent({ turns: [{ role: "user", parts }], turnComplete: false }); } catch (e) { log("ERROR", "gallery", e?.message || String(e)); return false; }
