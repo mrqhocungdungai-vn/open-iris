@@ -38,10 +38,10 @@ function buildTurn(t) {
   const row = el("div", `turn ${t.kind}`);
   row.append(el("span", "who", t.kind === "you" ? tr("Bạn", "You") : "Iris"));
   if (t.kind === "you") {
-    const p = el("p"), via = el("span", `via ${t.via === "typed" ? "key" : "mic"}`);
+    const p = el("p"), via = el("span", `via ${t.via === "typed" ? "key" : t.via === "gallery" ? "gallery" : "mic"}`);
     via.role = "img";
-    via.ariaLabel = t.via === "typed" ? tr("gõ:", "typed:") : tr("nói:", "spoken:");
-    p.append(via, t.text);
+    via.ariaLabel = t.via === "typed" ? tr("gõ:", "typed:") : t.via === "gallery" ? tr("gửi từ Gallery:", "sent from Gallery:") : tr("nói:", "spoken:");
+    p.append(via, t.via === "gallery" ? tr("Đã gửi từ Gallery", "Sent from Gallery") : t.text);
     row.append(p);
     if (t.files.length) {
       const ul = el("ul", "files");
