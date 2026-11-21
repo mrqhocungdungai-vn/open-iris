@@ -56,6 +56,7 @@ function showButtons() {
   $("b-listen").title = listenOnly ? tr("Đang chỉ nghe: bấm để Iris nói lại", "Listening only: click to let Iris speak again") : tr("Chỉ nghe: Iris nghe nhưng không nói", "Listen only: Iris listens but does not speak");
   $("b-listen").classList.toggle("on", on && listenOnly);
   $("b-listen").disabled = !on;
+  showSend();
 }
 window.iris.getState().then((s) => ((live = s.status), (muted = s.muted), (listenOnly = s.listenOnly), showButtons()));
 window.iris.onStatus((s) => ((live = s), showButtons()));
@@ -145,10 +146,11 @@ function show(g) {
   turned = 0;
   const up = items.findIndex((it) => it.kind === "up");
   $("gup").hidden = up < 0; // none at ~/ (the top) or the disk root
-  $("gup").onclick = () => openCard(up);
+  $("gup").onclick = $("gback").onclick = () => openCard(up);
+  $("gback").disabled = up < 0;
   hint = n === (up < 0 ? 0 : 1)
     ? `${g.folder}: ${tr("thư mục trống. Bấm ⬆ để quay lên, ✕ để đóng.", "empty folder. Press ⬆ to go up, ✕ to close.")}`
-    : `${g.folder}${g.more > 0 ? ` (${tr("ẩn", "hiding")} ${g.more} ${tr("mục", "items")})` : ""}: ${tr("✌ cuộn để xoay, chụm để chọn thẻ, chụm 2 lần để mở, ⬆ lên thư mục cha, ✕ để đóng.", "✌ scroll to turn, pinch to pick a card, pinch twice to open, ⬆ parent folder, ✕ to close.")}`;
+    : `${g.folder}${g.more > 0 ? ` (${tr("ẩn", "hiding")} ${g.more} ${tr("mục", "items")})` : ""}: ${tr("✌ cuộn để xoay, chụm để chọn thẻ, chụm 2 lần để mở, ⬆ lên thư mục cha, ➤ gửi thẻ cho Iris, ✕ để đóng.", "✌ scroll to turn, pinch to pick a card, pinch twice to open, ⬆ parent folder, ➤ send the card to Iris, ✕ to close.")}`;
   $("ghint").textContent = hint;
   overlay.hidden = false;
   setZoom(1);
@@ -175,7 +177,31 @@ function turn(d) {
     c.style.opacity = Math.max(0.15, 1 - dist * 0.3);
     c.classList.toggle("front", i === f);
   });
+  showSend();
 }
+
+// ➤ sends only the card's path (main does it, silently); dimmed while Iris is offline, never for the ⬆ card.
+function showSend() {
+  const off = live === "offline";
+  for (const id of ["gsend", "vsend"]) {
+    $(id).disabled = off;
+    $(id).title = off ? tr("Iris chưa chạy", "Iris is not running") : tr("Gửi đường dẫn thẻ này cho Iris", "Send this card's path to Iris");
+  }
+  const it = items[front()];
+  if (!it || it.kind === "up") $("gsend").disabled = true;
+}
+
+let sentTimer = 0;
+async function send(i) {
+  if (!(await window.iris.gallerySend(i).catch(() => false))) return;
+  const name = items[i].name;
+  $("gsent").textContent = tr(`Đã gửi "${name}" cho Iris: nói Iris cần làm gì`, `Sent "${name}" to Iris: tell Iris what to do`);
+  $("gsent").hidden = false;
+  clearTimeout(sentTimer);
+  sentTimer = setTimeout(() => ($("gsent").hidden = true), 4000);
+}
+$("gsend").onclick = () => send(front());
+$("vsend").onclick = () => send(viewing);
 
 const turnTo = (i) => turn(ringTo(turned, i, cards.length));
 

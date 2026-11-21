@@ -11,11 +11,14 @@
   <p id="ghint"></p>
   <button id="gclose" title="Đóng gallery" data-en-title="Close the gallery">✕</button>
   <button id="gup" title="Lên thư mục cha" data-en-title="Parent folder">⬆</button>
+  <!-- outside #cards: the two-hand zoom scales #cards only, so this bar never moves -->
+  <div id="gbar"><button id="gback" title="Lên thư mục cha" data-en-title="Parent folder" data-en="← Back">← Quay lại</button><button id="gsend" class="send" data-en="➤ Send to Iris">➤ Gửi cho Iris</button></div>
   <div id="viewer" hidden>
     <img id="big" alt="" />
     <div id="vzoom"></div>
-    <div id="vbar"><button id="vback" data-en="← Back">← Quay lại</button></div>
+    <div id="vbar"><button id="vback" data-en="← Back">← Quay lại</button><button id="vsend" class="send" data-en="➤ Send to Iris">➤ Gửi cho Iris</button></div>
   </div>
+  <p id="gsent" hidden></p>
 </section>
 <div id="ring" hidden></div>
 <div id="odock" hidden>
