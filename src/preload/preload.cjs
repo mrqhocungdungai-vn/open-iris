@@ -63,7 +63,7 @@ contextBridge.exposeInMainWorld("iris", {
 // Hand control: Features › Hand Task Vision in the main window (gesture/setup.js, engine.js) and the HUD (gesture/index.html).
 contextBridge.exposeInMainWorld("gesture", {
   mouse: (action, x, y) => ipcRenderer.send("mouse", { action, x, y }),
-  vision: (on) => ipcRenderer.send("vision", on),
+  vision: (on, quiet) => ipcRenderer.send("vision", on, quiet), // quiet: launch auto-start and reset, no announcement (hud.mjs)
   onVision: on("vision"),
   hand: (state) => ipcRenderer.send("hand", state), // engine → HUD, per frame
   onHand: on("hand"),
