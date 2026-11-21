@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, label, needsTrust, runsCommands, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
+import { canRunNow, clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, label, needsTrust, runsCommands, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
 
 const plugin = (over = {}) => ({
   name: "block-bank", on: false, fields: [{ key: "topic", max: 5 }],
@@ -96,4 +96,14 @@ test("toolPatch matches config:plugin { name, tools: { [tool]: { on } } }", () =
 test("hearsSpeech only for UserTurn/IrisTurn commands", () => {
   assert.equal(hearsSpeech({ commands: [{ event: "PreToolCall" }] }), false);
   assert.equal(hearsSpeech({ commands: [{ event: "PreToolCall" }, { event: "IrisTurn" }] }), true);
+});
+
+test("canRunNow needs an open session and the plugin and group on", () => {
+  assert.equal(canRunNow("listening", true, true), true);
+  assert.equal(canRunNow("speaking", true, true), true);
+  assert.equal(canRunNow("offline", true, true), false);
+  assert.equal(canRunNow("connecting", true, true), false);
+  assert.equal(canRunNow(undefined, true, true), false);
+  assert.equal(canRunNow("listening", false, true), false);
+  assert.equal(canRunNow("listening", true, false), false);
 });

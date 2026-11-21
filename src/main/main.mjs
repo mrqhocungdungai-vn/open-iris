@@ -535,6 +535,8 @@ const listPlugins = () => {
   return loadPlugins(home, (m) => log("WARN", "plugins", m)).map((p) => pluginEntry(p, config[p.name], trust[p.name], trustHash, lang));
 };
 ipcMain.handle("plugins:list", () => listPlugins());
+// Tab Plugin › Run now on a Tick group: hooks.mjs runs it in the live session. → "" or why it did not run.
+ipcMain.handle("plugins:run-now", (_e, id) => (typeof id === "string" && hooks ? hooks.runNow(id) : "no session"));
 // The renderer sends only the name: main hashes the folder itself. Applies from the next Start.
 ipcMain.handle("plugins:trust", (_e, name) => {
   const p = loadPlugins(home).find((x) => x.name === name && !x.error);

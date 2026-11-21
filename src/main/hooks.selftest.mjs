@@ -300,6 +300,22 @@ assert.equal(sent.length, 0);
 await c.run(2);
 assert.deepEqual(sent.map((s) => s[0]), [309_000]);
 
+// K6 run now: runs the Tick group at once (still through quiet and gap) and restarts its period from now.
+sent = [];
+({ c, hk } = ticking({ recap: { on: true } }, (text) => sent.push([c.now(), text])));
+assert.equal(hk.runNow("livestream/recap"), "no session");
+hk.start();
+await c.run(10);
+assert.equal(hk.runNow("livestream/nope"), "not a Tick group of this session");
+assert.equal(hk.runNow("livestream/recap"), "");
+await c.run(2);
+assert.deepEqual(sent.map((s) => s[0]), [12_000]); // queued by the async run, sent at the next loop, like a timed Tick
+await c.run(298);
+assert.equal(sent.length, 1); // the next one is 5 min after the run now (310 s), not at 300 s
+await c.run(1);
+assert.deepEqual(sent.map((s) => s[0]), [12_000, 311_000]);
+hk.stop();
+
 // speak from UserTurn with no session is dropped, not queued for later.
 sent = [];
 const speakPlugin = parsePlugin("talk", { ...meta, name: "talk", fields: [] }, () => ({ hooks: { UserTurn: [{ name: "echo", hooks: [{ type: "speak", text: "Say hi." }] }] } }));

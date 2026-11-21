@@ -730,6 +730,17 @@ export function createHooks({
       const t = sessionTools.find((x) => x.name === id);
       say(id, text, onSent, false, t && [t.plugin, "tools", id.slice(t.plugin.length + 2)]);
     },
+    // Plugin tab › Run now: run one Tick group of this session at once; its period restarts from now.
+    // The speak still waits for quiet and the gap like any other. → "" or why it did not run.
+    runNow(id) {
+      if (!tick) return "no session";
+      const k = ticks.find((x) => x.id === id);
+      if (!k) return "not a Tick group of this session";
+      log(`hook ${id}: run now`);
+      k.at = now() + k.everyMs;
+      runTick(id).catch((e) => log(`hook ${id}: ${e.message}`));
+      return "";
+    },
     // The command tools of this session, fixed at SessionStart like the desktop tool switches.
     tools: () => sessionTools,
     offTools: () => sessionOff,

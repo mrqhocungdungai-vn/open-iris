@@ -94,7 +94,7 @@ Sau không tệ hơn trước. Các câu giọng bị lỡ trên 3.8 có ở c�
 
 ### Để sau, khi có nhu cầu
 
-- K6: nút "Chạy ngay" cho Tick. **Đang chờ user duyệt bản xem trước HTML.** Chưa có code.
+- K6: nút "Chạy ngay" cho Tick. **Xong.** User duyệt bản xem trước; `hooks.runNow(id)` chạy nhóm Tick ngay và tính lại chu kỳ từ lúc bấm, lượt nói vẫn chờ 4 s yên lặng và cách 60 s. Nút mờ khi chưa Start hoặc nhóm tắt; nhóm bật giữa phiên báo "bật từ lần Start sau".
 - K7: **Xong, `06ef8e1`.** Mọi lệnh SessionStart chung trần 15 giây (`SESSION_START_MAX_MS`). Lệnh sau chỉ được phần thời gian còn lại, hết thì bỏ qua và ghi `failed` vào log. Test nằm trong `hooks.selftest.mjs`.
 - L4: **Không làm, đã đo.** `scripts/spikes/live-input.mjs` (2026-11-20) cho thấy chữ gõ tay đều được trả lời trên cả 3.8 và 3.1, dù gửi bằng `sendRealtimeInput({text})` hay bằng `sendClientContent`. Ảnh thì chỉ `sendClientContent` mới nhìn thấy: gửi qua realtime `video`, cả hai model đều nói "can't see". Hộp nhập gửi chữ và ảnh trong cùng một lượt, nên giữ một cách gửi là `sendClientContent`.
 - K5 cũ (chỉ cảnh báo) đã gộp vào L1.

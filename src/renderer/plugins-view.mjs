@@ -66,3 +66,5 @@ export const toolPatch = (p, tool, on) => ({ name: p.name, tools: { [tool.name]:
 export const pluginPatch = (p, on) => ({ name: p.name, on });
 export const groupPatch = (p, g, change) => ({ name: p.name, groups: { [g.name]: change } });
 export const fieldPatch = (p, f, value) => ({ name: p.name, fields: { [f.key]: String(value).slice(0, f.max || 500) } });
+// Run now on a Tick group: only while a session is open and the plugin and group are on (main checks it ran at Start too).
+export const canRunNow = (status, pluginOn, groupOn) => !!(pluginOn && groupOn) && (status === "listening" || status === "speaking");

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld("iris", {
   installPlugins: (picks) => ipcRenderer.invoke("plugins:install", picks), // ticked scan paths ([] cancels) → { installed, errors }
   savePlugin: (patch) => ipcRenderer.invoke("config:plugin", patch), // { name, on?, fields?, groups?: { [group]: { on?, every_min? } } }
   listPlugins: () => ipcRenderer.invoke("plugins:list"), // Plugin tab cards; main rebuilds it on every call
+  runHookNow: (id) => ipcRenderer.invoke("plugins:run-now", id), // Tick group "plugin/group" → "" or why it did not run
   removePlugin: (name) => ipcRenderer.invoke("plugins:remove", name), // main asks first → true if removed
   trustPlugin: (name) => ipcRenderer.invoke("plugins:trust", name), // main hashes the folder into ~/.open-iris/trust.json
   start: (opts) => ipcRenderer.invoke("live:start", opts),

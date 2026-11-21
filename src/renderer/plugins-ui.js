@@ -1,6 +1,6 @@
 // Plugin tab (4th tab): one card per plugin from main's plugins:list. Hooks only this round (no skills, tools, gestures).
 // main validates every patch; on/off and every_min apply at the next Start, fields at once.
-import { clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, kindLabel, label, needsTrust, pluginPatch, t, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
+import { canRunNow, clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, kindLabel, label, needsTrust, pluginPatch, t, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
 
 const $ = (id) => document.getElementById(id);
 const lang = () => document.documentElement.lang;
@@ -71,6 +71,26 @@ async function trustOnly(p) {
   load();
 }
 
+// Tick group › Run now: main runs it in the live session; the speak still waits for quiet and the 60 s gap.
+const runNowState = (b) => {
+  b.disabled = !canRunNow($("status").dataset.state, b.dataset.pluginOn === "1", b.dataset.groupOn === "1");
+  b.title = b.disabled ? tr("Bấm Start và bật nhóm này trước", "Press Start and turn this group on first") : "";
+};
+function runNowBtn(p, g) {
+  const b = h("button", { type: "button", className: "run-now", textContent: tr("Chạy ngay", "Run now") });
+  Object.assign(b.dataset, { pluginOn: p.on ? "1" : "0", groupOn: g.on ? "1" : "0" });
+  b.onclick = async () => {
+    const why = await window.iris.runHookNow(`${p.name}/${g.name}`).catch((e) => String(e?.message || e));
+    b.textContent = why ? tr("Chưa chạy: bật từ lần Start sau", "Not run: applies from the next Start") : tr("✓ Đã xếp lượt", "✓ Queued");
+    b.disabled = true;
+    setTimeout(() => ((b.textContent = tr("Chạy ngay", "Run now")), runNowState(b)), 2000);
+  };
+  runNowState(b);
+  return b;
+}
+// Only the buttons change with the session: a full render would drop focus from a field being typed in.
+window.iris.onStatus(() => document.querySelectorAll(".run-now").forEach(runNowState));
+
 function groupRow(p, g) {
   return h("div", { className: "group" },
     h("label", {}, sw(g.on, (e) => turn(p, { group: g.name, on: e.target.checked }, groupPatch(p, g, { on: e.target.checked })), label(lang(), g)), label(lang(), g)),
@@ -80,7 +100,7 @@ function groupRow(p, g) {
       h("span", { className: "every" }, tr("mỗi ", "every "),
         h("input", { type: "number", min: 2, max: 60, value: g.every_min ?? g.every_min_default, ariaLabel: tr("Chu kỳ, phút", "Period, minutes"),
           onchange: (e) => save(groupPatch(p, g, { every_min: clampEvery(e.target.value, g.every_min_default ?? 5) })) }),
-        tr(" phút", " min")),
+        tr(" phút", " min"), runNowBtn(p, g)),
     ...g.commands.map((c) => h("pre", { className: "cmd", textContent: `$ ${c}` })),
   );
 }
