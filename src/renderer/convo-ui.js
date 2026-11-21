@@ -40,6 +40,7 @@ function buildTurn(t) {
   if (t.kind === "you") {
     const p = el("p"), via = el("span", `via ${t.via === "typed" ? "key" : t.via === "gallery" ? "gallery" : "mic"}`);
     via.role = "img";
+    if (t.via === "gallery") via.textContent = { folder: "📁", file: "📄", image: "🖼" }[t.files[0]?.kind] || "📄"; // the Gallery card's emoji
     via.ariaLabel = t.via === "typed" ? tr("gõ:", "typed:") : t.via === "gallery" ? tr("gửi từ Gallery:", "sent from Gallery:") : tr("nói:", "spoken:");
     p.append(via, t.via === "gallery" ? tr("Đã gửi từ Gallery", "Sent from Gallery") : t.text);
     row.append(p);
