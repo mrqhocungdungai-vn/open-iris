@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createResumer, freshSession, resumeNote } from "./resume.mjs";
+import { createResumer, freshSession, renewFresh, resumeNote } from "./resume.mjs";
 
 // Fake clock and fake connect: each connect records the handle it was given and returns a closable session.
 function rig({ fail = () => false } = {}) {
@@ -194,4 +194,34 @@ test("resumeNote says what history cannot", () => {
   assert.match(n, /click were cut off/);
   assert.match(n, /Listen mode is still ON/);
   assert.match(n, /\/a\.png/);
+});
+
+test("renewFresh: Stop+Start during the connect makes the renew stale, so it never overwrites or ends the new session", async () => {
+  const late = () => { let release, fail; const p = new Promise((res, rej) => { release = res; fail = rej; }); return { p, release, fail }; };
+  // connect returns a session after a Stop+Start: closed, reported stale
+  let c = late(), current;
+  const r1 = createResumer({ connect: () => c.p });
+  current = r1;
+  const s = { closed: false, close() { this.closed = true; } };
+  let p = renewFresh(r1, null, () => current);
+  current = createResumer({ connect: async () => ({}) }); // Stop+Start: main swaps in a new resumer
+  c.release(s);
+  assert.deepEqual(await p, { stale: true });
+  assert.ok(s.closed);
+  // connect throws after a Stop+Start: stale, not an error main would turn into endSession
+  c = late(); current = r1;
+  p = renewFresh(r1, null, () => current);
+  current = {};
+  c.fail(new Error("network down"));
+  assert.deepEqual(await p, { stale: true });
+  // not stale: session comes back, errors still reach main
+  c = late(); current = r1;
+  p = renewFresh(r1, null, () => current);
+  const s2 = { close() {} };
+  c.release(s2);
+  assert.equal((await p).session, s2);
+  c = late();
+  p = renewFresh(r1, null, () => current);
+  c.fail(new Error("bad key"));
+  await assert.rejects(p, /bad key/);
 });

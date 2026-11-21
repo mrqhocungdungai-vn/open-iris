@@ -15,7 +15,7 @@ import { TOOL_DEFAULTS, cleanTools, desktopTools } from "./desktop.mjs";
 import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput } from "./input.mjs";
-import { createResumer, freshSession, resumeNote } from "./resume.mjs";
+import { createResumer, renewFresh, resumeNote } from "./resume.mjs";
 import { ago, deafWatch, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
 import { cleanName, cleanSkills, greeting, nameFor, loadPersona, loadSkills, personaBrief, savePersona, skillTools } from "./persona.mjs";
@@ -428,7 +428,10 @@ async function renewSession(kind) {
   send("live:context", (meter.last = null));
   send("live:status", "connecting");
   try {
-    session = await freshSession(resumer, old); // null when Stop came during the connect: start() closed it
+    const gen = startGen; // Stop bumps it before Start swaps the resumer (after the SessionStart hooks)
+    const out = await renewFresh(resumer, old, () => (gen === startGen ? resumer : null)); // stale: Stop (+Start) came during the connect
+    if (out.stale) return;
+    session = out.session; // null when Stop came during the connect: start() closed it
   } catch (e) {
     log("ERROR", "live", `${kind}: ${e?.message || e}`);
     endSession({ reason: e?.message || String(e) });

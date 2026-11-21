@@ -60,6 +60,16 @@ export async function freshSession(resumer, old) {
   return resumer.start();
 }
 
+// freshSession for main: Stop then Start during the connect swaps main's resumer (current() !== r), so whatever this
+// connect returns or throws belongs to no one: close it and report stale, so main leaves the new session alone.
+export async function renewFresh(r, old, current) {
+  let s;
+  try { s = await freshSession(r, old); } catch (e) { if (current() === r) throw e; return { stale: true }; }
+  if (current() === r) return { session: s };
+  try { s?.close(); } catch {}
+  return { stale: true };
+}
+
 // Silent note after a reconnect (S3): what the model cannot know from its own history. S0 showed a cut-off tool call
 // is not re-issued, and the model keeps waiting for it unless told.
 export function resumeNote({ handle, lost = [], listenOnly = false, looking = "" }) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canRunNow, clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, label, needsTrust, runsCommands, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
+import { canRunNow, runNowResult, clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, label, needsTrust, runsCommands, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
 
 const plugin = (over = {}) => ({
   name: "block-bank", on: false, fields: [{ key: "topic", max: 5 }],
@@ -106,4 +106,12 @@ test("canRunNow needs an open session and the plugin and group on", () => {
   assert.equal(canRunNow(undefined, true, true), false);
   assert.equal(canRunNow("listening", false, true), false);
   assert.equal(canRunNow("listening", true, false), false);
+});
+
+test("runNowResult maps main's runNow reply to the button text", () => {
+  assert.deepEqual(runNowResult(""), ["✓ Đã xếp lượt", "✓ Queued"]);
+  assert.deepEqual(runNowResult("still running"), ["Đang chạy, chờ lần trước xong", "Still running, wait for it to finish"]);
+  assert.deepEqual(runNowResult("not a Tick group of this session"), ["Chưa chạy: bật từ lần Start sau", "Not run: applies from the next Start"]);
+  assert.deepEqual(runNowResult("no session"), ["Chưa chạy, xem log", "Not run, see the log"]);
+  assert.deepEqual(runNowResult("EPIPE broken"), ["Chưa chạy, xem log", "Not run, see the log"]);
 });

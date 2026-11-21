@@ -68,3 +68,10 @@ export const groupPatch = (p, g, change) => ({ name: p.name, groups: { [g.name]:
 export const fieldPatch = (p, f, value) => ({ name: p.name, fields: { [f.key]: String(value).slice(0, f.max || 500) } });
 // Run now on a Tick group: only while a session is open and the plugin and group are on (main checks it ran at Start too).
 export const canRunNow = (status, pluginOn, groupOn) => !!(pluginOn && groupOn) && (status === "listening" || status === "speaking");
+// Run now click result: main's runNow returns "" when queued, else why not. Returns the [vi, en] pair.
+export function runNowResult(why) {
+  if (!why) return ["✓ Đã xếp lượt", "✓ Queued"];
+  if (why === "still running") return ["Đang chạy, chờ lần trước xong", "Still running, wait for it to finish"];
+  if (why === "not a Tick group of this session") return ["Chưa chạy: bật từ lần Start sau", "Not run: applies from the next Start"];
+  return ["Chưa chạy, xem log", "Not run, see the log"];
+}

@@ -1,6 +1,6 @@
 // Plugin tab (4th tab): one card per plugin from main's plugins:list. Hooks only this round (no skills, tools, gestures).
 // main validates every patch; on/off and every_min apply at the next Start, fields at once.
-import { canRunNow, clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, kindLabel, label, needsTrust, pluginPatch, t, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
+import { canRunNow, runNowResult, clampEvery, eventLabel, fieldPatch, groupPatch, hearsSpeech, kindLabel, label, needsTrust, pluginPatch, t, toolPatch, toolsLine, toolsState, trustState } from "./plugins-view.mjs";
 
 const $ = (id) => document.getElementById(id);
 const lang = () => document.documentElement.lang;
@@ -81,7 +81,7 @@ function runNowBtn(p, g) {
   Object.assign(b.dataset, { pluginOn: p.on ? "1" : "0", groupOn: g.on ? "1" : "0" });
   b.onclick = async () => {
     const why = await window.iris.runHookNow(`${p.name}/${g.name}`).catch((e) => String(e?.message || e));
-    b.textContent = why ? tr("Chưa chạy: bật từ lần Start sau", "Not run: applies from the next Start") : tr("✓ Đã xếp lượt", "✓ Queued");
+    b.textContent = tr(...runNowResult(why));
     b.disabled = true;
     setTimeout(() => ((b.textContent = tr("Chạy ngay", "Run now")), runNowState(b)), 2000);
   };
