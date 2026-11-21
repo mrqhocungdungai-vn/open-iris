@@ -1,6 +1,8 @@
 {
   "enabledPlugins": {
     "ponytail@ponytail": true,
-    "excalidraw-live@excalidraw-live": true
+    "excalidraw-live@excalidraw-live": true,
+    "claude-md-management@anthropic-plugin-directory": true,
+    "frontend-design@anthropic-plugin-directory": true
   }
 }

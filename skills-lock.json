@@ -1,6 +1,34 @@
 {
   "version": 2,
   "skills": {
+    "gemini-api-cli": {
+      "source": "google-gemini/gemini-skills",
+      "commit": "c4d0c62c1240e08a90546186bf320600ab6a039a",
+      "sourceType": "github",
+      "skillPath": "skills/gemini-api-cli/SKILL.md",
+      "computedHash": "14863670f4e9406da5403e619d37abb230ce097fa76666481dff0bf69eb56b6b"
+    },
+    "gemini-api-dev": {
+      "source": "google-gemini/gemini-skills",
+      "commit": "c4d0c62c1240e08a90546186bf320600ab6a039a",
+      "sourceType": "github",
+      "skillPath": "skills/gemini-api-dev/SKILL.md",
+      "computedHash": "b3823bd7210e46d4528ca85ebc03326842a6df47ced9a856a1729639f9756c12"
+    },
+    "gemini-live-api-dev": {
+      "source": "google-gemini/gemini-skills",
+      "commit": "c4d0c62c1240e08a90546186bf320600ab6a039a",
+      "sourceType": "github",
+      "skillPath": "skills/gemini-live-api-dev/SKILL.md",
+      "computedHash": "d3a558b43681fd11798a25c63650368be6c2623d0aba6fabe7835483d092509b"
+    },
+    "gemini-omni-flash-api": {
+      "source": "google-gemini/gemini-skills",
+      "commit": "c4d0c62c1240e08a90546186bf320600ab6a039a",
+      "sourceType": "github",
+      "skillPath": "skills/gemini-omni-flash-api/SKILL.md",
+      "computedHash": "a975a1e145284a6e27bcc6a1759946271ac62fb0f671b342c3705eab9812a3dc"
+    },
     "hallmark": {
       "source": "Nutlope/hallmark",
       "commit": "04977e15f3dfd6ee4b74c887dac3eb52665d6c92",
