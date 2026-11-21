@@ -45,10 +45,10 @@ contextBridge.exposeInMainWorld("iris", {
   onInterrupt: on("live:interrupt"),
   onAnnounce: on("announce:play"), // base64 24 kHz s16 clip of a fixed system line (main/announce.mjs)
   onStatus: on("live:status"),
-  onLog: on("live:log"),
-  getHistory: () => ipcRenderer.invoke("live:history"), // recent live:log rows kept in main memory (chat window)
+  onEvent: on("live:event"), // conversation events, see docs/chat-ui-plan.md §2
+  getHistory: () => ipcRenderer.invoke("live:history"), // recent live:event payloads kept in main memory (chat window)
   onContext: on("live:context"), // { used, max, trimAt } once per turn, null after "↺ Làm mới"
-  sendInput: (parts, label) => ipcRenderer.invoke("live:input", parts, label), // typed turn → true if sent
+  sendInput: (parts, meta) => ipcRenderer.invoke("live:input", parts, meta), // typed turn ({ text, files: [{ name, kind }] } for the conversation) → true if sent
   clearContext: () => ipcRenderer.send("live:clear"), // "↺ Làm mới": a new session, same setup, mic and 👂 kept
   // HUD buttons (gesture/hud-ui.js); the main window runs the actual Start/Stop.
   toggle: () => ipcRenderer.send("iris:toggle"),

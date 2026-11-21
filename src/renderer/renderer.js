@@ -9,35 +9,17 @@ function setLang(lang) {
     el.dataset.vi ??= el.textContent;
     el.textContent = tr(el.dataset.vi, el.dataset.en);
   }
-  for (const a of ["title", "aria-label", "placeholder"])
+  for (const a of ["title", "aria-label", "placeholder", "data-empty"])
     for (const el of document.querySelectorAll(`[data-en-${a}]`)) {
       if (!el.hasAttribute(`data-vi-${a}`)) el.setAttribute(`data-vi-${a}`, el.getAttribute(a));
       el.setAttribute(a, tr(el.getAttribute(`data-vi-${a}`), el.getAttribute(`data-en-${a}`)));
     }
   document.dispatchEvent(new Event("langchange")); // dynamic text re-renders itself
 }
-// One row per line, tagged you / iris / err / sys for styling; capped like the HUD transcript.
-// Gemini speaks in chunks, one log line each; same-speaker chunks join one row, like the HUD transcript.
-const log = (line) => {
-  const who = /^(you|iris):/.exec(line)?.[0];
-  const last = $("log").lastElementChild;
-  if (who && last?.dataset.who === who) {
-    last.textContent += line.slice(who.length + 1); // chunks carry their own spaces
-    $("log").scrollTop = $("log").scrollHeight;
-    return;
-  }
-  const row = document.createElement("div");
-  if (who) row.dataset.who = who;
-  row.className = /^(you|iris):/.exec(line)?.[1] ?? (/^error:|failed/.test(line) ? "err" : "sys");
-  row.textContent = line;
-  $("log").append(row);
-  while ($("log").childElementCount > 200) $("log").firstChild.remove();
-  $("log").scrollTop = $("log").scrollHeight; // conversation box keeps the newest line in view
-};
-// Start problems go next to the Start button, in words the user can act on; the raw line still goes to the log.
+// Start problems go next to the Start button, in words the user can act on; the raw line still goes to the conversation.
 const showError = (what, e) => {
   const raw = e?.message || String(e);
-  log(`${what} failed: ${raw}`);
+  document.dispatchEvent(new CustomEvent("convo:local", { detail: { type: "RUN_ERROR", message: `${what} failed: ${raw}` } }));
   $("error").textContent =
     e?.name === "NotAllowedError" ? tr("Chưa cấp quyền micro. Mở Cài đặt hệ thống › Quyền riêng tư & Bảo mật › Micro, bật cho app này rồi bấm Bắt đầu lại.", "No microphone permission. Open System Settings › Privacy & Security › Microphone, turn it on for this app, then press Start again.")
     : e?.name === "NotFoundError" ? tr("Không tìm thấy micro nào. Cắm hoặc bật micro rồi bấm Bắt đầu lại.", "No microphone found. Plug in or turn on a microphone, then press Start again.")
@@ -219,7 +201,6 @@ const skillBoxes = () => [...document.querySelectorAll("#skills input")];
 
 window.iris.onAudio(play);
 window.iris.onInterrupt(flushPlayback);
-window.iris.onLog(log);
 const showStatus = () => {
   const s = $("status").dataset.state;
   $("status").textContent = { offline: tr("Chưa chạy", "Not running"), connecting: tr("Đang kết nối…", "Connecting…"), listening: listenOnly ? tr("Chỉ nghe", "Listening only") : tr("Đang nghe", "Listening"), speaking: tr("Iris đang nói", "Iris is speaking") }[s] ?? s;

@@ -27,8 +27,8 @@ window.iris.getState().then((s) => ((status = s.status), (muted = s.muted), (lis
 window.iris.onStatus((s) => (status = s));
 window.iris.onListen((on) => (listenOnly = on));
 window.iris.onMute((m) => (muted = m));
-window.iris.onLog((line) => {
-  if (line.startsWith("🤖 ") && !listenOnly) thinking = toolCall(thinking, performance.now());
+window.iris.onEvent((e) => {
+  if (e.type === "TOOL_CALL_START" && !listenOnly) thinking = toolCall(thinking, performance.now());
 });
 window.gesture.onHud((on) => ((hud = on), (sentState = "")));
 

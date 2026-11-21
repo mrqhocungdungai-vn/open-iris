@@ -18,3 +18,12 @@ export function cleanInput(parts) {
   }
   return size <= INPUT_MAX_BYTES ? out : null;
 }
+
+// The typed turn as the conversation shows it (live:event). meta comes from the renderer: only short strings pass.
+export function typedEvent(meta) {
+  const files = (Array.isArray(meta?.files) ? meta.files : []).slice(0, 10)
+    .filter((f) => typeof f?.name === "string" && (f.kind === "image" || f.kind === "text"))
+    .map((f) => ({ name: f.name.slice(0, 120), kind: f.kind }));
+  const delta = typeof meta?.text === "string" ? meta.text.trim().slice(0, 2000) : "";
+  return { type: "TEXT_MESSAGE_CONTENT", role: "user", via: "typed", delta, files };
+}

@@ -1,0 +1,71 @@
+/* Conversation turns (convo-ui.js), shared by the main window and the 💬 chat window. The stage is dark in both themes. */
+.stage {
+  --stage: #15191f; --stage-2: #1c2129; --rule: #2a313b;
+  --iris: #eef1f5; --you: #9aa5b4; --act: #6fb3f2; --ok: #7cc9a0; --bad: #f08c84; --bad-bg: #2a1a1c; /* ≥ 7:1 on --stage */
+  --voice: ui-serif, "New York", Georgia, serif;
+  --ui: system-ui, -apple-system, sans-serif;
+  position: relative; color-scheme: dark; background: var(--stage); color: var(--iris); font-family: var(--ui);
+}
+.visually-hidden { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+#log { overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--rule) transparent; }
+#log:empty::before { content: attr(data-empty); display: block; max-inline-size: 30ch; color: var(--you); font: 400 22px/1.3 var(--voice); }
+#log > :first-child { margin-block-start: 0; }
+.turn { display: grid; grid-template-columns: 3.25rem minmax(0, 62ch); column-gap: 16px; margin-block-start: 22px; }
+.who { grid-column: 1; padding-block-start: 3px; font-size: 12px; font-weight: 600; color: var(--you); text-align: end; }
+.turn > :not(.who) { grid-column: 2; }
+
+.you p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--you); overflow-wrap: anywhere; }
+.via { display: inline-block; inline-size: 12px; block-size: 12px; margin-inline-end: 6px; vertical-align: -1px; background: currentColor; opacity: 0.75; }
+.via.mic { mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Crect x='4' y='1' width='4' height='7' rx='2'/%3E%3Cpath d='M2.5 6a3.5 3.5 0 0 0 7 0M6 9.5V11' stroke='%23000' fill='none' stroke-width='1.2'/%3E%3C/svg%3E") center/contain no-repeat; }
+.via.key { mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Crect x='.6' y='2.6' width='10.8' height='6.8' rx='1.5' fill='none' stroke='%23000' stroke-width='1.2'/%3E%3Cpath d='M3 7.2h6' stroke='%23000' stroke-width='1.2'/%3E%3C/svg%3E") center/contain no-repeat; }
+.files { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.files li { padding: 3px 8px; border: 1px solid var(--rule); border-radius: 6px; font-size: 11.5px; color: var(--you); }
+
+.iris .who { color: var(--act); }
+.iris p { margin: 0; font: 17px/1.55 var(--voice); color: var(--iris); text-wrap: pretty; overflow-wrap: anywhere; }
+.iris p:empty { display: none; }
+.cut { margin-inline-start: 6px; font: 12.5px var(--ui); color: var(--you); white-space: nowrap; }
+
+/* Tool calls: stage directions above the words they lead to. */
+.acts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; padding: 0; list-style: none; font-size: 12.5px; color: var(--act); }
+.acts li { display: inline-flex; align-items: center; gap: 6px; }
+.acts li::before { content: ""; flex: none; inline-size: 7px; block-size: 7px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid currentColor; }
+.acts .run::before { background: currentColor; animation: convo-pulse 1.1s ease-in-out infinite; }
+.acts .ok::before { inline-size: 9px; block-size: 9px; border: 0; border-radius: 0; background: var(--ok);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 5.2 4 7.6 8.6 2.4' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; }
+.acts .fail { color: var(--bad); }
+.acts .fail::before { inline-size: 6px; block-size: 6px; border: 0; border-radius: 1px; rotate: 45deg; background: var(--bad); }
+.acts .ms { color: var(--you); font-variant-numeric: tabular-nums; }
+.acts .src { padding: 0 5px; border-radius: 4px; background: #1f2a37; color: var(--you); font-size: 11px; }
+.acts details { display: contents; }
+.acts summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; text-decoration: underline dotted 1px; text-underline-offset: 3px; }
+.acts summary::-webkit-details-marker { display: none; }
+.acts li:has(details[open]) { flex-basis: 100%; flex-wrap: wrap; }
+.acts .reason { display: none; }
+.acts details[open] .reason { display: block; flex-basis: 100%; margin: 4px 0 2px 13px; padding: 6px 10px; border-radius: 6px; background: var(--bad-bg); overflow-wrap: anywhere; }
+
+/* Iris speaking: three bars after the last word of the open turn, the one ambient motion. */
+.speaking { display: none; gap: 2px; block-size: 12px; margin-inline-start: 6px; vertical-align: -1px; align-items: end; }
+#log[data-speaking] > .turn.open:last-child .speaking { display: inline-flex; }
+.speaking i { inline-size: 2px; block-size: 100%; border-radius: 1px; background: var(--act); transform-origin: bottom; animation: convo-bar 0.9s ease-in-out infinite; }
+.speaking i:nth-child(2) { animation-delay: -0.3s; }
+.speaking i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes convo-bar { 0%, 100% { scale: 1 0.3; } 50% { scale: 1 1; } }
+@keyframes convo-pulse { 50% { opacity: 0.35; } }
+
+.err { margin: 18px 0 0; padding: 8px 12px; border-radius: 6px; background: var(--bad-bg); color: var(--bad); font-size: 13.5px; overflow-wrap: anywhere; }
+.divider { display: flex; align-items: center; gap: 12px; margin: 26px 0 4px; font-size: 12px; color: var(--you); }
+.divider::before, .divider::after { content: ""; flex: 1; border-block-start: 1px solid var(--rule); }
+
+/* Jump to the newest, only while scrolled up. */
+#log-jump { position: absolute; inset-block-end: 10px; inset-inline-start: 50%; translate: -50%; min-block-size: 0;
+  padding: 5px 12px; border: 1px solid var(--rule); border-radius: 999px; background: #222a34; color: var(--iris); font: 12.5px var(--ui); cursor: pointer; box-shadow: 0 6px 18px -6px #000a; }
+#log-jump[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) { .speaking i, .acts .run::before { animation: none; } }
+@media (max-width: 600px) {
+  .turn { grid-template-columns: minmax(0, 1fr); }
+  .who { padding: 0 0 2px; text-align: start; }
+  .turn > :not(.who) { grid-column: 1; }
+}

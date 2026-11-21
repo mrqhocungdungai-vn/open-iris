@@ -49,8 +49,8 @@ async function sendNow() {
   const parts = buildParts(text, good);
   if (!parts.length || sending) return;
   sending = true; render();
-  const label = [text.trim(), ...good.map((it) => "📎 " + it.name)].filter(Boolean).join("  ");
-  const ok = await window.iris.sendInput(parts, label).catch(() => false);
+  const meta = { text: text.trim(), files: good.map((it) => ({ name: it.name, kind: it.kind })) };
+  const ok = await window.iris.sendInput(parts, meta).catch(() => false);
   sending = false;
   if (ok) { items.forEach((it) => it.url && URL.revokeObjectURL(it.url)); items = []; $("say").value = ""; }
   else { $("error").textContent = tr("Không gửi được cho Iris.", "Could not send to Iris."); $("error").hidden = false; }
@@ -59,7 +59,7 @@ async function sendNow() {
 }
 
 $("compose").onsubmit = (e) => { e.preventDefault(); sendNow(); };
-$("say").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendNow(); } }; // isComposing: Vietnamese IME
+$("say").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); sendNow(); } }; // isComposing / 229: Vietnamese IME (Safari-based engines report 229 on the committing Enter)
 $("attach").onclick = () => $("attach-in").click();
 $("attach-in").onchange = () => { add([...$("attach-in").files]); $("attach-in").value = ""; };
 // ⌘V of a copied image or file attaches it; plain text pastes as usual.

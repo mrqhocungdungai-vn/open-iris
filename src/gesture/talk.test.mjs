@@ -1,13 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatPlace, pushLine } from "./talk.js";
-
-test("pushLine glues one speaker's chunks and keeps the last max rows", () => {
-  const rows = [];
-  for (const l of ["you: mở", "you:  Finder", "🤖 open_app", "iris: Đã", "iris:  mở.", "you: cảm ơn"]) pushLine(rows, l);
-  assert.deepEqual(rows, ["you: mở Finder", "🤖 open_app", "iris: Đã mở.", "you: cảm ơn"]);
-  assert.deepEqual(pushLine(rows, "iris: ok", 3), ["🤖 open_app", "iris: Đã mở.", "you: cảm ơn", "iris: ok"].slice(1));
-});
+import { chatPlace } from "./talk.js";
 
 const area = { x: 0, y: 25, width: 1440, height: 800 }; // menu bar on top, Dock hidden
 

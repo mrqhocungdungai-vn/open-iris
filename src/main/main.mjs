@@ -10,11 +10,10 @@ import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { cleanDevice } from "../renderer/devices.js";
-import { pushLine } from "../gesture/talk.js";
 import { TOOL_DEFAULTS, cleanTools, desktopTools } from "./desktop.mjs";
 import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "./live-config.mjs";
 import { contextMeter } from "./context-meter.mjs";
-import { cleanInput } from "./input.mjs";
+import { cleanInput, typedEvent } from "./input.mjs";
 import { createResumer, renewFresh, resumeNote } from "./resume.mjs";
 import { ago, deafWatch, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
 import { createAnnouncer, sayLine } from "./announce.mjs";
@@ -94,10 +93,10 @@ let enabledTools = []; // registry entries switched on for this session
 // The window is already destroyed when window-all-closed calls stopLive().
 // The HUD (gesture/) shows status and transcript too; audio goes to the main window only.
 let liveStatus = "offline"; // last live:status, for a HUD opened mid-session
-const history = []; // recent live:log rows, memory only (gone on quit), for the HUD 💬 chat window opened mid-session
+const history = []; // recent live:event payloads, memory only (gone on quit), for the HUD 💬 chat window opened mid-session
 const send = (channel, payload) => {
   if (channel === "live:status") liveStatus = payload;
-  if (channel === "live:log") pushLine(history, payload);
+  if (channel === "live:event" && history.push(payload) > 400) history.splice(0, history.length - 400);
   for (const w of channel === "live:audio" ? [win] : BrowserWindow.getAllWindows()) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 };
 let muted = false; // HUD 🔇: mic chunks are dropped here, the session stays open
@@ -210,7 +209,7 @@ async function connectLive(opts) {
         onmessage: handleMessage,
         onerror: (e) => {
           log("ERROR", "live", `ws error: ${e?.message || e}`);
-          send("live:log", `error: ${e?.message || e}`);
+          send("live:event", { type: "RUN_ERROR", message: String(e?.message || e) });
         },
         onclose: (e) => {
           log("INFO", "live", `closed code=${e?.code} reason=${e?.reason || "(none)"} micChunksSent=${chunksIn}`);
@@ -277,7 +276,7 @@ function handleMessage(message) {
   if (content.inputTranscription?.text || content.outputTranscription?.text) hooks?.markActivity(); // a speak hook waits for quiet
   if (content.inputTranscription?.text) {
     log("DEBUG", "transcript", `you: ${content.inputTranscription.text}`);
-    send("live:log", `you: ${content.inputTranscription.text}`);
+    send("live:event", { type: "TEXT_MESSAGE_CONTENT", role: "user", via: "voice", delta: content.inputTranscription.text });
     userSaid += content.inputTranscription.text;
     taint.clear(); // the user's own words
     lastHeardAt = Date.now();
@@ -292,12 +291,13 @@ function handleMessage(message) {
   }
   if (content.outputTranscription?.text) {
     log("DEBUG", "transcript", `iris: ${content.outputTranscription.text}`);
-    send("live:log", `iris: ${content.outputTranscription.text}`);
+    send("live:event", { type: "TEXT_MESSAGE_CONTENT", role: "assistant", via: "voice", delta: content.outputTranscription.text });
   }
   if (content.interrupted) {
     log("INFO", "turn", `interrupted after ${chunksOut} audio chunks`);
     chunksOut = 0;
     send("live:interrupt");
+    send("live:event", { type: "RUN_FINISHED", interrupted: true });
     send("live:status", "listening");
     return;
   }
@@ -315,6 +315,7 @@ function handleMessage(message) {
   if (content.turnComplete) {
     log("INFO", "turn", `complete, ${chunksOut} audio chunks`);
     chunksOut = 0;
+    send("live:event", { type: "RUN_FINISHED", interrupted: false });
     send("live:status", "listening");
   }
 }
@@ -331,8 +332,8 @@ function endSession(e) {
   resumer?.stop();
   endHooks();
   setListenOnly(false);
-  if (refusedModel(e)) send("live:log", readConfig().lang === "en" ? "error: This model is not available. Pick another model in Settings." : "error: Mô hình này chưa dùng được. Hãy chọn mô hình khác trong Thiết lập.");
-  send("live:log", `closed: ${e?.code ?? ""} ${e?.reason || ""}`);
+  if (refusedModel(e)) send("live:event", { type: "RUN_ERROR", message: readConfig().lang === "en" ? "This model is not available. Pick another model in Settings." : "Mô hình này chưa dùng được. Hãy chọn mô hình khác trong Thiết lập." });
+  send("live:event", { type: "CUSTOM", name: "session", value: { phase: "closed", code: e?.code ?? null, reason: String(e?.reason || "").slice(0, 200) } });
   send("live:status", "offline");
 }
 function endHooks() {
@@ -354,13 +355,17 @@ async function handleToolCalls(calls) {
   const functionResponses = await Promise.all(calls.map(async ({ id, name, args }) => {
     const tool = enabledTools.find((t) => t.name === name);
     if (tool?.plugin) fromPlugin.add(id);
+    // The conversation shows every call and its end; no args (they can hold typed text).
+    send("live:event", { type: "TOOL_CALL_START", toolCallId: id, toolCallName: name, source: tool?.desktop ? "desktop" : tool?.plugin ? "plugin" : "skill" });
+    const done = (ok, error) => send("live:event", { type: "TOOL_CALL_RESULT", toolCallId: id, ok, ms: Date.now() - t0, ...(!ok && { error: String(error ?? "").slice(0, 200) }) });
     const pre = (await h?.emit("PreToolCall", { tool: { name, args } })) ?? { block: false, context: "" };
     if (pre.tainted) fromPlugin.add(id); // command hook text goes into this response
-    if (pre.block) return { id, name, response: { error: pre.reason } }; // emit already logged who blocked it
+    if (pre.block) { done(false, pre.reason); return { id, name, response: { error: pre.reason } }; } // emit already logged who blocked it
     // Desktop calls queue up in call order (a click then a type must not race); skill calls run in parallel.
     const r = !tool ? { ok: false, error: `tool not enabled: ${name}` } : tool.desktop ? await (desktopQueue = desktopQueue.then(() => runDesktop(tool, args))) : await tool.run(args, { id, onLate: (result, { from, args: used }) => sendLate(s, h, id, name, used, from, result) });
     const out = r.ok ? { output: r.output } : { error: r.error };
     log("INFO", "perf", `V2 tool=${name} ms=${Date.now() - t0} ok=${r.ok}`); // includes waiting in desktopQueue
+    done(r.ok, typeof r.error === "string" ? r.error : JSON.stringify(r.error));
     log("INFO", "tool", `${name} ${JSON.stringify(args || {}).slice(0, 80)} -> ${r.ok ? "ok" : "error"} ${JSON.stringify(out).length}B`);
     if (!r.ok && tool?.desktop) log("WARN", "tool", `${name} ${JSON.stringify(r.error).slice(0, 2000)}`); // why a type or click failed, for the eval loop
     const post = (await h?.emit("PostToolCall", { tool: { name, args }, result: out })) ?? { context: "" };
@@ -394,7 +399,6 @@ function sendLate(s, h, id, name, args, from, result) {
 let desktopQueue = Promise.resolve();
 async function runDesktop(tool, args) {
   lockHand(true);
-  send("live:log", `🤖 ${tool.name}`); // the HUD transcript shows why the hand stopped answering
   try { return await tool.run(args); } finally { lockHand(false); }
 }
 
@@ -448,6 +452,7 @@ async function renewSession(kind) {
     clearing = false;
   }
   if (!session) return;
+  if (kind === "clear") send("live:event", { type: "CUSTOM", name: "session", value: { phase: "renewed" } });
   // The new session does not know: say it silently, as after a reconnect.
   if (listenOnly) try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: "[session] Listen mode is ON: keep listening, do not reply, do not speak and do not call any tool until it ends." }] }], turnComplete: false }); } catch (e) { log("ERROR", "live", `${kind}: listen note: ${e?.message || e}`); }
   if (looking) tellLooking();
@@ -618,15 +623,15 @@ ipcMain.handle("key:save", async (_e, key) => {
 ipcMain.handle("live:start", (_e, opts) => startLive(opts));
 ipcMain.handle("live:stop", () => stopLive());
 ipcMain.on("live:clear", () => clearContext());
-// Manual input box (compose-ui.js): typed text, images and text files as one user turn. label is for the log only.
-ipcMain.handle("live:input", (_e, parts, label) => {
+// Manual input box (compose-ui.js): typed text, images and text files as one user turn. meta { text, files } is what the conversation shows.
+ipcMain.handle("live:input", (_e, parts, meta) => {
   const clean = cleanInput(parts);
   if (!session || !clean) return false;
   log("INFO", "input", `typed turn: ${clean.map((p) => p.inlineData?.mimeType || "text").join(", ")}`);
   taint.clear(); // the user's own typed words
   try { session.sendClientContent({ turns: [{ role: "user", parts: clean }], turnComplete: true }); } catch (e) { log("ERROR", "input", e?.message || String(e)); return false; }
   lastVoiceAt = lastHeardAt = Date.now(); // V1 for a typed turn starts at the send
-  send("live:log", `⌨ ${String(label || "").slice(0, 300)}`);
+  send("live:event", typedEvent(meta));
   return true;
 });
 // HUD buttons: Start/Stop goes through the main window so it uses that window's model/voice/tool picks.
@@ -660,7 +665,7 @@ function onDeaf(ms) {
   deafTries++;
   log("WARN", "live", `deaf session: ${(ms / 1000).toFixed(1)}s voice, no transcript, model=${meter.model} plugins=${livePlugins} try=${deafTries}`);
   if (deafTries <= 2) return void renewSession("deaf");
-  if (deafTries === 3) send("live:log", readConfig().lang === "en" ? "error: Gemini cannot hear you in this session. Try the 3.1 model in Settings." : "error: Gemini không nghe được bạn trong phiên này. Hãy thử mô hình 3.1 trong Thiết lập.");
+  if (deafTries === 3) send("live:event", { type: "RUN_ERROR", message: readConfig().lang === "en" ? "Gemini cannot hear you in this session. Try the 3.1 model in Settings." : "Gemini không nghe được bạn trong phiên này. Hãy thử mô hình 3.1 trong Thiết lập." });
 }
 
 // Gallery View feature: a folder browser full screen in the overlay (gesture/hud-ui.js). Every entry is a card: images show

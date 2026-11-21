@@ -106,13 +106,9 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 .perm-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 0; }
 #perm-hint { margin: 4px 0 0; color: var(--muted); }
 
-/* Conversation: the one dark surface, in both themes (DESIGN.md code-window-card). */
-#log { color-scheme: dark; flex: 1; min-height: 120px; margin: 0; padding: 16px; overflow-y: auto; white-space: pre-wrap; border-radius: 12px; background: var(--stage); color: var(--on-stage); font: inherit; line-height: 1.55; }
-#log:empty::before { content: "chưa có hội thoại"; color: var(--on-stage-2); font: 400 23px/1.2 var(--serif); letter-spacing: -0.02em; }
-:root:lang(en) #log:empty::before { content: "no conversation yet"; }
-#log .you, #log .sys { color: var(--on-stage-2); }
-#log .sys, #log .err { font-size: 12px; }
-#log .err { color: #e8907f; }
+/* Conversation: the one dark surface, in both themes. Turn styles are in convo.css. */
+#p-talk { gap: 0; border-radius: 12px; overflow: hidden; }
+#p-talk #log { flex: 1; min-height: 120px; padding: 24px 28px 16px 12px; }
 
 /* Bottom strip, under the tabs: orb left, #run buttons middle, camera right. A real row, so the tab above shrinks instead of being covered;
    the buttons always keep it on screen. */
@@ -176,19 +172,35 @@ body:has(#t-talk:checked) #p-talk, body:has(#t-set:checked) #p-set, body:has(#t-
 #ctx .mark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); }
 #ctx[data-near] .fill { background: var(--wait); }
 
-/* Manual input box (compose-ui.js) under #log. */
-#compose { display: flex; flex-direction: column; gap: 6px; }
-#compose .line { display: flex; gap: 6px; align-items: flex-end; }
-#compose textarea { flex: 1; min-height: 36px; max-height: 120px; resize: none; font: inherit; padding: 8px 10px; border-radius: 10px; }
-#compose[data-drop] textarea { outline: 2px dashed var(--accent); }
+/* Manual input box (compose-ui.js) under #log, on the dark stage: one field holding 📎, the text and send. */
+#compose { display: flex; flex-direction: column; gap: 8px; padding: 8px 16px 16px; }
+#compose .line { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 4px; padding: 6px; border: 1px solid var(--rule); border-radius: 14px; background: var(--stage-2); }
+#compose .line:focus-within { border-color: #3d5f82; }
+#compose[data-drop] .line { outline: 2px dashed var(--act); }
+#compose textarea { field-sizing: content; min-height: 1lh; max-height: 8lh; padding: 7px 4px; border: 0; resize: none; background: none; color: var(--iris); font: 15px/1.4 var(--ui); outline: none; }
+#compose textarea::placeholder { color: #7d8896; }
+#compose textarea:disabled { opacity: 0.6; }
+#attach { min-inline-size: 34px; min-block-size: 34px; padding: 0; border: 0; border-radius: 9px; background: none; }
+#attach:hover:enabled { background: #262c35; }
+#say-send { min-block-size: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: var(--cta); color: #fff; font-weight: 600; }
+#say-send:hover:enabled { background: var(--cta-2); }
+#say-send:disabled { background: #262c35; color: #6b7684; }
 #chips { display: flex; flex-wrap: wrap; gap: 6px; }
 #chips:empty { display: none; }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 8px; border: 1px solid var(--hair); border-radius: 999px; font-size: 12px; }
-.chip img { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; }
-.chip[data-bad] { color: #c0563f; border-color: #c0563f; }
-.chip button { padding: 0 6px; min-height: 0; }
-#hud-box { display: flex; align-items: center; gap: 6px; color: var(--muted); }
-#hud-box { white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 3px; border-radius: 8px; background: #232933; color: var(--iris); font-size: 12.5px; }
+.chip img { width: 26px; height: 26px; object-fit: cover; border-radius: 5px; }
+.chip[data-bad] { color: var(--bad); }
+.chip button { min-inline-size: 22px; min-block-size: 22px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--you); }
+/* HUD switch drawn as a button the size of its neighbours: the real checkbox (role=switch) covers it, invisible, so clicks, focus and setup.js stay as they were. */
+#hud-box { position: relative; display: inline-flex; align-items: center; gap: 7px; min-block-size: 36px; padding: 0 12px 0 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-weight: 500; white-space: nowrap; cursor: pointer; user-select: none; transition: background-color 0.12s, color 0.12s; }
+#hud-box:hover { background: var(--card); color: var(--text); }
+#hud-box:has(:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+#hud-box input { position: absolute; inset: 0; width: auto; height: auto; margin: 0; opacity: 0; cursor: pointer; }
+#hud-box svg { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+#hud-box circle { fill: currentColor; stroke: none; }
+#hud-box:has(:checked) { border-color: transparent; background: color-mix(in srgb, var(--accent) 22%, var(--bg)); color: light-dark(#185a9c, #cfe6fb); }
+#hud-box:has(:checked):hover { background: color-mix(in srgb, var(--accent) 30%, var(--bg)); }
+@media (prefers-reduced-motion: reduce) { #hud-box { transition: none; } }
 /* ? at the right end of the header: the help menu for the whole app. */
 #tabs { margin-left: auto; }
 #help { min-inline-size: 0; width: 28px; min-block-size: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--muted); font-size: 13px; }
