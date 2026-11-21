@@ -46,6 +46,11 @@ test("typed turns never glue and carry their files", () => {
   assert.deepEqual(t[1].files, []);
 });
 
+test("a Send to Iris from the gallery is its own user turn with its file; the next spoken words start a new turn", () => {
+  const t = run([you("", "gallery", [{ name: "a.jpg", kind: "image" }]), you("cái"), you(" này")]);
+  assert.deepEqual(t.map((x) => [x.kind, x.via, x.text, x.files]), [["you", "gallery", "", [{ name: "a.jpg", kind: "image" }]], ["you", "voice", "cái này", []]]);
+});
+
 test("errors and session ends are their own rows; a session end closes the open Iris turn", () => {
   const t = run([iris("Đang"), { type: "RUN_ERROR", message: "ws error" }, iris("x"), { type: "CUSTOM", name: "session", value: { phase: "closed", code: 1011, reason: "internal" } }]);
   assert.deepEqual(t.map((x) => x.kind), ["iris", "error", "iris", "session"]);

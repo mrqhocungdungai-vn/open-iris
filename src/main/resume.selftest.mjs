@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createResumer, freshSession, renewFresh, resumeNote } from "./resume.mjs";
+import { createResumer, freshSession, renewFresh, resumeNote, sentNote } from "./resume.mjs";
 
 // Fake clock and fake connect: each connect records the handle it was given and returns a closable session.
 function rig({ fail = () => false } = {}) {
@@ -194,6 +194,14 @@ test("resumeNote says what history cannot", () => {
   assert.match(n, /click were cut off/);
   assert.match(n, /Listen mode is still ON/);
   assert.match(n, /\/a\.png/);
+});
+
+test("resumeNote names files sent with Send to Iris only in a new session; the handle keeps them otherwise", () => {
+  const sent = ["/p/a.jpg", "/p/docs"];
+  assert.match(resumeNote({ handle: null, sent }), /sent you \/p\/a\.jpg, \/p\/docs\./);
+  assert.doesNotMatch(resumeNote({ handle: "h", sent }), /a\.jpg/);
+  assert.doesNotMatch(resumeNote({ handle: null }), /sent you/);
+  assert.equal(sentNote(["/x.png"]), "[gallery] Earlier the user sent you /x.png. Wait for their next words to know what to do with it.");
 });
 
 test("renewFresh: Stop+Start during the connect makes the renew stale, so it never overwrites or ends the new session", async () => {

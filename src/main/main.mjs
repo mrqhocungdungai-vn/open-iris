@@ -16,7 +16,7 @@ import { ABILITIES, abilitiesTool, keyFormatOk, liveSetup, refusedModel } from "
 import { contextMeter } from "./context-meter.mjs";
 import { cleanInput, typedEvent } from "./input.mjs";
 import { SENT_TOOL, sentFileTool } from "./gallery-send.mjs";
-import { createResumer, renewFresh, resumeNote } from "./resume.mjs";
+import { createResumer, renewFresh, resumeNote, sentNote } from "./resume.mjs";
 import { ago, deafWatch, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
 import { createAnnouncer, sayLine } from "./announce.mjs";
 import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls, silentNote } from "./listen.mjs";
@@ -241,7 +241,7 @@ async function connectLive(opts) {
     connect: open,
     onReconnect: (s, handle) => {
       session = s;
-      const note = resumeNote({ handle, lost: [...inFlight.values()], listenOnly, looking });
+      const note = resumeNote({ handle, lost: [...inFlight.values()], listenOnly, looking, sent: [...sentFiles] });
       inFlight.clear();
       log("INFO", "live", `resumed ${handle ? "with handle" : "fresh"}`);
       send("live:context", meter.last);
@@ -466,6 +466,7 @@ async function renewSession(kind) {
   // The new session does not know: say it silently, as after a reconnect.
   if (listenOnly) try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: "[session] Listen mode is ON: keep listening, do not reply, do not speak and do not call any tool until it ends." }] }], turnComplete: false }); } catch (e) { log("ERROR", "live", `${kind}: listen note: ${e?.message || e}`); }
   if (looking) tellLooking();
+  if (sentFiles.size) sendParts([{ text: sentNote([...sentFiles]) }]); // a deaf renew keeps what was sent (↺ cleared it before)
 }
 function setMuted(on) {
   muted = on;
@@ -735,7 +736,9 @@ ipcMain.handle("gallery:send", (_e, i) => {
   const kind = fs.statSync(f, { throwIfNoEntry: false })?.isDirectory() ? "folder" : IMAGE_EXT.test(f) ? "image" : "file";
   sentFiles.add(f);
   log("INFO", "gallery", `sent ${kind} ${f}`);
-  return sendParts([{ text: `[gallery] The user sent you ${kind} ${f}. Wait for their next words to know what to do with it.` }]);
+  if (!sendParts([{ text: `[gallery] The user sent you ${kind} ${f}. Wait for their next words to know what to do with it.` }])) return false;
+  send("live:event", { type: "TEXT_MESSAGE_CONTENT", role: "user", via: "gallery", delta: "", files: [{ name: path.basename(f), kind }] }); // the chat shows what was sent
+  return true;
 });
 ipcMain.on("gallery:look", (_e, i) => lookAt((Number.isInteger(i) && IMAGE_EXT.test(galleryEntries[i] ?? "") && galleryEntries[i]) || ""));
 
