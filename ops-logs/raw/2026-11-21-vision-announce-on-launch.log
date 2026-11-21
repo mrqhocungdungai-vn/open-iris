@@ -1,0 +1,7 @@
+2026-11-21T08:57:04.450Z [INFO] [app] start electron=42.5.0 level=debug log=<redacted>
+2026-11-21T08:57:04.686Z [INFO] [vision] on
+2026-11-21T08:57:04.687Z [INFO] [control] off
+2026-11-21T08:59:04.853Z [INFO] [vision] off
+2026-11-21T08:59:04.854Z [INFO] [control] off
+2026-11-21T08:59:04.875Z [INFO] [vision] on
+2026-11-21T08:59:04.876Z [INFO] [control] off
