@@ -18,7 +18,7 @@ import { cleanInput } from "./input.mjs";
 import { createResumer, renewFresh, resumeNote } from "./resume.mjs";
 import { ago, deafWatch, micMeter, rms16, VOICE_RMS } from "./perf.mjs";
 import { createAnnouncer, sayLine } from "./announce.mjs";
-import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls } from "./listen.mjs";
+import { LISTEN_OFF_EVENT, LISTEN_ON_EVENT, refuseCalls, silentNote } from "./listen.mjs";
 import { cleanName, cleanSkills, greeting, nameFor, loadPersona, loadSkills, personaBrief, savePersona, skillTools } from "./persona.mjs";
 import { installFrom, parseGithubUrl, scanPlugins } from "./plugin-install.mjs";
 import { cleanPluginConfig, createHooks, createTaint, deliverLate, killCommands, loadPlugins, NAME, trustHash } from "./hooks.mjs";
@@ -101,7 +101,6 @@ const send = (channel, payload) => {
 };
 let muted = false; // HUD 🔇: mic chunks are dropped here, the session stays open
 let listenOnly = false; // 👂: Iris's audio and transcript are dropped and tools refused, the mic still goes in
-let announcing = null; // timer while Iris says "listen mode is on": its output passes the listen-only gate until then
 let hooks = null; // plugin hooks (hooks.mjs) of this session
 let userSaid = "", irisSaid = ""; // transcript of the current turn, for UserTurn/IrisTurn hooks
 let resumer = null; // "Giữ phiên dài" (resume.mjs): reconnects a dropped connection as the same session
@@ -283,10 +282,9 @@ function handleMessage(message) {
     lastHeardAt = Date.now();
     deaf?.heard();
   }
-  if (content.outputTranscription?.text && !(listenOnly && !announcing)) irisSaid += content.outputTranscription.text; // dropped words were never heard
+  if (content.outputTranscription?.text && !listenOnly) irisSaid += content.outputTranscription.text; // dropped words were never heard
   if (content.turnComplete) endTurn();
-  if (announcing && content.turnComplete) endAnnounce();
-  else if (listenOnly && !announcing) {
+  if (listenOnly) {
     // Only the user's words show; Iris's audio and transcript are dropped.
     if (content.turnComplete || content.interrupted) send("live:status", "listening");
     return;
@@ -457,28 +455,19 @@ function setMuted(on) {
   muted = on;
   send("live:mute", on);
 }
-// The notice is a full turn, so Iris says the new state aloud from any switch (👂 button, HUD, 👍 hold); the gate above
-// enforces the silence after that. Turning on cuts what Iris was saying, then lets the one announcing turn through.
-// shortcut: the grace ends at the next turnComplete or after 8s, so a reply already in flight can slip out before the
-// announcement; track the announcing turn itself if users hear that.
+// From any switch (👂 button, HUD, 👍 hold) the announcement clip tells the user and Iris gets a silent note, so Iris
+// never says the change itself. Turning on cuts what Iris was saying; the gate above drops anything after.
 function setListenOnly(on) {
   if (listenOnly === on) return;
   listenOnly = on;
   log("INFO", "live", `listen-only ${on ? "on" : "off"}`);
-  endAnnounce();
   if (session) {
-    if (on) {
-      send("live:interrupt");
-      announcing = setTimeout(endAnnounce, 8000);
-    }
-    try { session.sendClientContent({ turns: [{ role: "user", parts: [{ text: on ? LISTEN_ON_EVENT : LISTEN_OFF_EVENT }] }], turnComplete: true }); } catch (e) { log("ERROR", "live", `listen notice: ${e?.message || e}`); }
+    if (on) send("live:interrupt");
+    announce(on ? "listen-on" : "listen-off"); // only while Iris runs: Stop clears listen mode after session is gone
+    try { session.sendClientContent(silentNote(on ? LISTEN_ON_EVENT : LISTEN_OFF_EVENT)); } catch (e) { log("ERROR", "live", `listen notice: ${e?.message || e}`); }
     hooks?.emit("ListenOnlyChanged", { listen_only: on }).catch((e) => log("ERROR", "plugins", `ListenOnlyChanged: ${e.message}`));
   }
   send("live:listen", on);
-}
-function endAnnounce() {
-  clearTimeout(announcing);
-  announcing = null;
 }
 
 ipcMain.handle("config:get", () => ({ ...readConfig(), hasKey: !!process.env.GEMINI_API_KEY, persona: loadPersona(home), options: { lang: LANGS, model: MODELS, voice: VOICES, desktopTools: desktopTools().map((t) => t.name), skills: loadSkills(home).map(({ name, description }) => ({ name, description })), plugins: loadPlugins(home) } }));
@@ -753,13 +742,11 @@ app.whenReady().then(() => {
   });
   app.dock?.setIcon(path.join(import.meta.dirname, "../../assets", "icon.png")); // no packaged build yet, so dev would show Electron's icon
   log("INFO", "app", `start electron=${process.versions.electron} level=${process.env.LOG_LEVEL || "info"} log=${logFile}`);
-  // shortcut: accepts the old control-only (on) and the new (event, on) from hud.mjs; drop the old form once A1 lands.
-  initGesture(log, home, (event, on) => {
-    if (typeof event === "boolean") [event, on] = ["control", event];
+  initGesture(log, home, (event, on) => { // event "vision" | "control", only on a real change (hud.mjs)
     announce(`${event}-${on ? "on" : "off"}`);
-    if (event !== "control") return;
-    // A full turn, so Iris speaks: the user may not be looking at the HUD when the 🤘 hold or ⌃⌥G switches it.
-    try { session?.sendClientContent({ turns: [{ role: "user", parts: [{ text: `[hand control] Hand control is now ${on ? "ON" : "OFF"}. Tell the user in one short sentence.` }] }], turnComplete: true }); } catch (e) { log("ERROR", "control", e?.message || String(e)); }
+    // The clip tells the user (with or without Start); Iris only gets a silent note and does not say it.
+    const note = event === "control" ? `[hand control] Hand control is now ${on ? "ON" : "OFF"}.` : `[hand vision] Hand Task Vision is now ${on ? "ON" : "OFF"}.`;
+    try { session?.sendClientContent(silentNote(note)); } catch (e) { log("ERROR", "control", e?.message || String(e)); }
   });
   win = new BrowserWindow({
     width: 800,
