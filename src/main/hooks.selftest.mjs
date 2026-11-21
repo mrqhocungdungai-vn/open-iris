@@ -316,6 +316,38 @@ await c.run(1);
 assert.deepEqual(sent.map((s) => s[0]), [12_000, 311_000]);
 hk.stop();
 
+// Run now while the same Tick group is still running (slow command): refused, and the timed Tick skips it too.
+{
+  const slowPlugin = parsePlugin("slow", { ...meta, name: "slow", fields: [] }, () => ({
+    hooks: { Tick: [{ name: "job", every_min: 2, hooks: [{ type: "command", command: "x" }] }] },
+  }));
+  slowPlugin.dir = home;
+  let runs = 0, finish;
+  const logs = [];
+  const sc = clock();
+  const sh2 = createHooks({
+    plugins: [slowPlugin], home, trust: { slow: "h" }, hashOf: () => "h", send: () => true, log: (l) => logs.push(l),
+    run: () => (runs++, new Promise((res) => (finish = () => res({ code: 0, stdout: "", stderr: "" })))),
+    now: sc.now, setInterval: sc.setInterval, clearInterval: sc.clearInterval,
+    getConfig: () => ({ slow: { on: true, fields: {}, groups: { job: { on: true } } } }),
+  });
+  sh2.start();
+  assert.equal(sh2.runNow("slow/job"), "");
+  await sc.run(1);
+  assert.equal(sh2.runNow("slow/job"), "still running");
+  assert.ok(logs.includes("hook slow/job: run now refused, still running"));
+  await sc.run(120); // the timed Tick comes due while the run is still going
+  assert.equal(runs, 1);
+  assert.ok(logs.includes("hook slow/job: skipped, still running"));
+  finish();
+  await sc.run(1);
+  assert.equal(sh2.runNow("slow/job"), ""); // finished: runs again
+  await sc.run(1);
+  assert.equal(runs, 2);
+  finish();
+  sh2.stop();
+}
+
 // speak from UserTurn with no session is dropped, not queued for later.
 sent = [];
 const speakPlugin = parsePlugin("talk", { ...meta, name: "talk", fields: [] }, () => ({ hooks: { UserTurn: [{ name: "echo", hooks: [{ type: "speak", text: "Say hi." }] }] } }));

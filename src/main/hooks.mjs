@@ -641,11 +641,16 @@ export function createHooks({
     pending.push(late ? { id, text, late, owner } : { id, text: `SYSTEM_EVENT_HOOK ${id}: ${text}`, tainted, owner });
   };
   const groupOf = ({ p, g }) => [p.name, "groups", g.name];
+  const tickRunning = new Set(); // Tick group ids with a run in flight: a group never runs twice at once
   async function runTick(id) {
     const item = active("Tick").find((x) => x.g.id === id);
     if (!item) return;
-    const r = await runGroup("Tick", item, {});
-    for (const s of r.speak) say(id, s, null, r.tainted, groupOf(item));
+    if (tickRunning.has(id)) return log(`hook ${id}: skipped, still running`);
+    tickRunning.add(id);
+    try {
+      const r = await runGroup("Tick", item, {});
+      for (const s of r.speak) say(id, s, null, r.tainted, groupOf(item));
+    } finally { tickRunning.delete(id); }
   }
   function loop() {
     const t = now();
@@ -736,6 +741,7 @@ export function createHooks({
       if (!tick) return "no session";
       const k = ticks.find((x) => x.id === id);
       if (!k) return "not a Tick group of this session";
+      if (tickRunning.has(id)) { log(`hook ${id}: run now refused, still running`); return "still running"; }
       log(`hook ${id}: run now`);
       k.at = now() + k.everyMs;
       runTick(id).catch((e) => log(`hook ${id}: ${e.message}`));
