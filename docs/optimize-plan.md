@@ -61,12 +61,13 @@ Hướng cần xem:
 | Mã | Nền | Sau | Thay đổi |
 |---|---|---|---|
 | V1 | p50/p95 (40 lượt mỗi model): 3.8-live 1173/1295 ms · 3.8-extended-thinking 1182/1318 · 3.1-flash 1323/1403. Đo từ lúc gửi xong câu nói đến gói audio đầu tiên, chưa tính mic và bộ đệm phát | | |
-| V2 | Tool chỉ đọc, chạy trên Calculator, 20 lần: list_running_apps 32/36 ms; scan/find/read 136/~150 ms; lần scan đầu tiên của một app 2295 ms | | |
+| V2 | Tool chỉ đọc, chạy trên Calculator, 20 lần: list_running_apps 32/36 ms; scan/find/read 136/~150 ms; lần scan đầu tiên của một app 2295 ms | Tool mới (2026-11-21, iris-desktop, thử trên TextEdit): scroll_app_view 81–104 ms; close_app 136 ms khi không có tệp chưa lưu, khoảng 5 s rồi TIMEOUT khi đang mở hộp thoại lưu (tool trả về DIALOG_OPEN) | Thêm close_app, scroll_app_view (`66e6e14`) |
 | V3 | Từ connect đến setupComplete, p50/p95 (20 lần mỗi model): 3.8-live 638/695 ms · extended-thinking 695/783 · 3.1-flash 484/574. Riêng bắt tay WebSocket mất khoảng 190 ms | | |
+| A0 | Thông báo hệ thống, tạo câu bằng phiên Live riêng (2026-11-21, iris-core, giọng Zephyr, 3 lượt × 6 câu): 3.8-live khớp chữ 18/18 ngay lần đầu, connect → audio cuối trung vị 1152 ms (1010–1644), dài 1,87 s; 3.1-flash 18/18 sau tối đa 2 lần thử (2 lần lặp đều ở "Hand Task Vision enabled"), 1378 ms (1218–6814, một lần ngoại lệ), dài 1,90 s. Tạo đủ 6 câu khoảng 7–9 s mỗi model. Độ dài có cả khoảng lặng đầu/cuối. Thử vọng tiếng mic: chưa chạy | | `docs/system-announce-plan.md` |
 | H1 | | | |
 | H2 | | | |
 | H3 | | | |
-| T1 | gemini-3.8-live, `promptTokenCount` lượt đầu ("Say OK."): tối thiểu 557 (phần cố định của server); mặc định 2194 (+1637); tắt hết tool 655 (+98); bật hết (3 skill, ghi chú, livestream) 2545 (+1988). Riêng 9 tool desktop + DESKTOP_BRIEF là **1539**, gần hết phần của mình | | |
+| T1 | gemini-3.8-live, `promptTokenCount` lượt đầu ("Say OK."): tối thiểu 557 (phần cố định của server); mặc định 2194 (+1637); tắt hết tool 655 (+98); bật hết (3 skill, ghi chú, livestream) 2545 (+1988). Riêng 9 tool desktop + DESKTOP_BRIEF là **1539**, gần hết phần của mình | 2026-11-21, iris-desktop, cùng cách đo (tool desktop mặc định trừ tắt hết): 11 tool lúc chưa cắt gọn 2201 (+662); sau khi cắt gọn **2126 (+587)** | +587 token mỗi phiên cho close_app, scroll_app_view, surface, window_id (`66e6e14`) |
 | T2 | Giọng: 15,5 s nói + 2 s im → +444 AUDIO, khoảng 25 token/s, tức khoảng 1,5k/phút (docs ghi 32/s). Ảnh composer: 256 token (64², 768²), 264 (1920×1080), 266 (4000×3000), nên thu nhỏ ảnh không bớt token. Ảnh gallery: 0 token ảnh, chỉ dòng `[gallery]` | | |
 | T3 | Đếm ký tự: system text mặc định 2534 (DESKTOP_BRIEF 1795); khai báo tool 4177 (scan_app_controls 481, press_key_combo 650, type_into_text_field 539, find_app_control 403, click_app_control 406); use_skill thêm cho mỗi skill; brief livestream: SessionStart 454, recap 155, cta 246 | | |
 
